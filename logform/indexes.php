@@ -16,7 +16,7 @@
             <h1 class="logo">Leave Management System</h1>
             <nav>
                 <ul>
-
+                    <li><a href="../security/security_question.php">Settings</a></li>
                     <li><a href="../logform/login.php">Logout</a></li>
                 </ul>
             </nav>
