@@ -113,7 +113,6 @@ $has_security = mysqli_num_rows($result) > 0;
             <li><a href="#">Change Password</a></li>
             <li><a href="#">Leave Remaining</a></li>
             <li><a href="#">Leave Request</a></li>
-            <li><a href="../stored_answer/security_question.php">Set Security Questions</a></li>
             <li><a href="../logform/login.php">Logout</a></li>
         </ul>
     </div>
