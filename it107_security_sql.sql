@@ -70,14 +70,50 @@ ALTER TABLE `users`
   ADD UNIQUE KEY `username` (`username`);
 
 --
--- AUTO_INCREMENT for dumped tables
+-- Table structure for table `user_security_questions`
+--
+
+CREATE TABLE `user_security_questions` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `question1` varchar(255) NOT NULL,
+  `answer1` varchar(255) NOT NULL,
+  `question2` varchar(255) NOT NULL,
+  `answer2` varchar(255) NOT NULL,
+  `question3` varchar(255) NOT NULL,
+  `answer3` varchar(255) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Indexes for dumped tables
 --
 
 --
--- AUTO_INCREMENT for table `users`
+-- Indexes for table `user_security_questions`
 --
-ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=82;
+ALTER TABLE `user_security_questions`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `user_id` (`user_id`);
+
+--
+-- AUTO_INCREMENT for dumped tables
+--
+--
+-- AUTO_INCREMENT for table `user_security_questions`
+--
+ALTER TABLE `user_security_questions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- Constraints for dumped tables
+--
+
+--
+-- Constraints for table `user_security_questions`
+--
+ALTER TABLE `user_security_questions`
+  ADD CONSTRAINT `user_security_questions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

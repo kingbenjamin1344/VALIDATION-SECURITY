@@ -49,6 +49,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $row = $result->fetch_assoc();
             if (password_verify($password, $row["password"])) {
                 $_SESSION["username"] = $username;
+                $_SESSION["user_id"] = $row["id"];
                 resetLoginAttempts(true);
 
                 // Redirect to a different page after successful login
@@ -131,61 +132,63 @@ echo '<script>
     
 </head>
 <body>
-    <!-- Navbar -->
-    <div class="navbar">
-        <div class="container flex">
-            <h1 class="logo">Leave Management System</h1>
-            <nav>
-                <ul>
-                    <li><a href="../logform/login.php">Home</a></li>
-                    <li><a href="../regform/register.php">Register</a></li>
-                </ul>
-            </nav>
-        </div>
-    </div>
-
-    <!-- Showcase -->
-    <section class="showcase">
-        <div class="container grid">
-            <div class="showcase-text">
-                <h1>South Loan & Finance Company Inc.</h1>
-                <p>In this website we will accommodate South Loan & Finance Company Inc. employees' leave requests through a system.</p>
+    <div class="main-content">
+        <!-- Navbar -->
+        <div class="navbar">
+            <div class="container flex">
+                <h1 class="logo">Leave Management System</h1>
+                <nav>
+                    <ul>
+                        <li><a href="../logform/login.php">Home</a></li>
+                        <li><a href="../regform/register.php">Register</a></li>
+                    </ul>
+                </nav>
             </div>
+        </div>
 
-            <div class="showcase-form card">
-                <center><h2>User Account</h2></center>
+        <!-- Showcase -->
+        <section class="showcase">
+            <div class="container grid">
+                <div class="showcase-text">
+                    <h1>South Loan & Finance Company Inc.</h1>
+                    <p>In this website we will accommodate South Loan & Finance Company Inc. employees' leave requests through a system.</p>
+                </div>
 
-                <!-- Display error message at the top of the form if it exists -->
-                <?php if (isset($_SESSION['error_message'])): ?>
-                    <div id="error_message" style="color: red; text-align: center; margin-bottom: 10px;">
-                        <?php echo $_SESSION['error_message']; ?>
-                        <?php unset($_SESSION['error_message']); ?>
-                    </div>
-                <?php endif; ?>
+                <div class="showcase-form card">
+                    <center><h2>User Account</h2></center>
 
-                <form name="myform" method="post" autocomplete="off" id="loginForm" onsubmit="return validateForm()">
-                    <div class="form-control">
-                        <input type="text" name="username" placeholder="Username"  oninput="return clearErrorMessage()">
-                        <span id="usernameerrormsg" style="color:red;"></span>
-                    </div>
-                    <div class="form-control">
-                        <input type="password" name="password" placeholder="Password" >
-                    </div>
-
-                    <input type="submit" value="Login" class="btn btn-primary" 
-                      <?php echo (isset($_SESSION['login_attempts']) && $_SESSION['login_attempts'] <= 0) ? 'disabled' : ''; ?>>
-
-                    <?php if (isset($_SESSION['login_attempts']) && $_SESSION['login_attempts'] <= 1): ?>
-                        <p style="text-align: center;">Forgot Password? <a href="../forgotpass/forgot.php">Click here</a></p>
+                    <!-- Display error message at the top of the form if it exists -->
+                    <?php if (isset($_SESSION['error_message'])): ?>
+                        <div id="error_message" style="color: red; text-align: center; margin-bottom: 10px;">
+                            <?php echo $_SESSION['error_message']; ?>
+                            <?php unset($_SESSION['error_message']); ?>
+                        </div>
                     <?php endif; ?>
 
-                </form>
+                    <form name="myform" method="post" autocomplete="off" id="loginForm" onsubmit="return validateForm()">
+                        <div class="form-control">
+                            <input type="text" name="username" placeholder="Username"  oninput="return clearErrorMessage()">
+                            <span id="usernameerrormsg" style="color:red;"></span>
+                        </div>
+                        <div class="form-control">
+                            <input type="password" name="password" placeholder="Password" >
+                        </div>
 
-                <!-- Countdown timer -->
-                <div id="cooldown-timer" style="text-align: center; color: red;"></div>
+                        <input type="submit" value="Login" class="btn btn-primary" 
+                          <?php echo (isset($_SESSION['login_attempts']) && $_SESSION['login_attempts'] <= 0) ? 'disabled' : ''; ?>>
+
+                        <?php if (isset($_SESSION['login_attempts']) && $_SESSION['login_attempts'] <= 1): ?>
+                            <p style="text-align: center;">Forgot Password? <a href="../forgotpass/forgot.php">Click here</a></p>
+                        <?php endif; ?>
+
+                    </form>
+
+                    <!-- Countdown timer -->
+                    <div id="cooldown-timer" style="text-align: center; color: red;"></div>
+                </div>
             </div>
-        </div>
-    </section>
+        </section>
+    </div>
 
     <div id="footer">
         <p>@South Loan & Finance Company Inc. All Right Reserve 2024</p>

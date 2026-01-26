@@ -72,22 +72,25 @@ p{
 }
 .showcase .grid{
     overflow: visible;
-    grid-template-columns: 50% 45%;
+    grid-template-columns: 1fr;
     gap: 45px;
+    justify-items: center;
+    align-items: center;
 }
 .showcase-form{
     position: relative;
-    top: 60px;
     height: 400px;
     width: 400px;
     padding: 40px;
     z-index: 100;
+    margin: 0 auto;
 }
 .showcase-form .form-control{
     margin: 50px 0;
 }
 .showcase-form input[type='text'],
-.showcase-form input[type='password']{
+.showcase-form input[type='password'],
+.showcase-form input[type='email']{
     border: 0;
     border-bottom: 1px solid #b4becb;
     width: 100%;
