@@ -176,7 +176,7 @@ echo '<script>
                       <?php echo (isset($_SESSION['login_attempts']) && $_SESSION['login_attempts'] <= 0) ? 'disabled' : ''; ?>>
 
                     <?php if (isset($_SESSION['login_attempts']) && $_SESSION['login_attempts'] <= 1): ?>
-                        <p style="text-align: center;">Forgot Password? <a href="../forgotpass/forgot.php">Click here</a></p>
+                        <p style="text-align: center;">Forgot Password? <a href="../forgot/forgot_password.php">Click here</a></p>
                     <?php endif; ?>
 
                 </form>
