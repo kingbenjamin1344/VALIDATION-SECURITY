@@ -7,25 +7,43 @@ if (!isset($_SESSION['username'])) {
     exit();
 }
 
+$username = $_SESSION['username'];
+
+// Get user ID
+$userStmt = $conn->prepare("SELECT id FROM users WHERE username=?");
+$userStmt->bind_param('s', $username);
+$userStmt->execute();
+$userResult = $userStmt->get_result();
+$userRow = $userResult->fetch_assoc();
+$user_id = $userRow['id'];
+
+$message = '';
+$message_type = '';
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['answers'])) {
     if (isset($_POST['edit'])) {
         // Load current questions
-        $username = $_SESSION['username'];
-        $stmt = $conn->prepare("SELECT security_q1, security_q2, security_q3 FROM users WHERE username=?");
-        $stmt->bind_param('s', $username);
+        $stmt = $conn->prepare("SELECT question_1, question_2, question_3 FROM security_questions WHERE user_id=?");
+        $stmt->bind_param('i', $user_id);
         $stmt->execute();
         $result = $stmt->get_result();
-        $user = $result->fetch_assoc();
-        $stmt->close();
+        $questions = $result->fetch_assoc();
         $_SESSION['selected_questions'] = [
-            'q1' => $user['security_q1'],
-            'q2' => $user['security_q2'],
-            'q3' => $user['security_q3']
+            'q1' => $questions['question_1'],
+            'q2' => $questions['question_2'],
+            'q3' => $questions['question_3']
         ];
     } else {
-        $personal = $_POST['personal'];
-        $childhood = $_POST['childhood'];
-        $preference = $_POST['preference'];
+        $personal = $_POST['personal'] ?? '';
+        $childhood = $_POST['childhood'] ?? '';
+        $preference = $_POST['preference'] ?? '';
+
+        if (empty($personal) || empty($childhood) || empty($preference)) {
+            $message = 'Please select all three questions.';
+            $message_type = 'error';
+            header('Location: security_question.php');
+            exit();
+        }
 
         // Store in session for next step
         $_SESSION['selected_questions'] = [
@@ -39,30 +57,58 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['answers'])) {
         header('Location: security_question.php');
         exit();
     }
-    $questions = $_SESSION['selected_questions'];
-}
-
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['answers'])) {
-    $answers = $_POST['answers'];
-    $username = $_SESSION['username'];
-
-    // Hash the answers
-    $hashed_a1 = password_hash($answers['a1'], PASSWORD_DEFAULT);
-    $hashed_a2 = password_hash($answers['a2'], PASSWORD_DEFAULT);
-    $hashed_a3 = password_hash($answers['a3'], PASSWORD_DEFAULT);
-
-    // Update the database
-    $stmt = $conn->prepare("UPDATE users SET security_q1=?, security_a1=?, security_q2=?, security_a2=?, security_q3=?, security_a3=? WHERE username=?");
-    $stmt->bind_param('sssssss', $questions['q1'], $hashed_a1, $questions['q2'], $hashed_a2, $questions['q3'], $hashed_a3, $username);
-    $stmt->execute();
-    $stmt->close();
-
-    unset($_SESSION['selected_questions']);
-    header('Location: ../logform/indexes.php?success=1');
-    exit();
 }
 
 $questions = $_SESSION['selected_questions'];
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['answers'])) {
+    $answer1 = trim($_POST['answers']['a1'] ?? '');
+    $answer2 = trim($_POST['answers']['a2'] ?? '');
+    $answer3 = trim($_POST['answers']['a3'] ?? '');
+    
+    if (empty($answer1) || empty($answer2) || empty($answer3)) {
+        $message = 'All fields are required.';
+        $message_type = 'error';
+    } else {
+        // Check if security questions already exist for user
+        $checkStmt = $conn->prepare("SELECT id FROM security_questions WHERE user_id=?");
+        $checkStmt->bind_param('i', $user_id);
+        $checkStmt->execute();
+        $checkResult = $checkStmt->get_result();
+        
+        if ($checkResult->num_rows > 0) {
+            // Update existing record
+            $stmt = $conn->prepare("UPDATE security_questions SET question_1=?, answer_1=?, question_2=?, answer_2=?, question_3=?, answer_3=? WHERE user_id=?");
+            $stmt->bind_param('ssssssi', 
+                $questions['q1'], $answer1, 
+                $questions['q2'], $answer2, 
+                $questions['q3'], $answer3, 
+                $user_id
+            );
+        } else {
+            // Insert new record
+            $stmt = $conn->prepare("INSERT INTO security_questions (user_id, question_1, answer_1, question_2, answer_2, question_3, answer_3) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param('issssss', 
+                $user_id,
+                $questions['q1'], $answer1, 
+                $questions['q2'], $answer2, 
+                $questions['q3'], $answer3
+            );
+        }
+        
+        if ($stmt->execute()) {
+            unset($_SESSION['selected_questions']);
+            $message = 'Security questions saved successfully!';
+            $message_type = 'success';
+            header('Refresh: 1.5; url: security_question.php');
+        } else {
+            $message = 'Error saving security questions. Please try again.';
+            $message_type = 'error';
+        }
+    }
+}
+
+$questions = $_SESSION['selected_questions'] ?? [];
 ?>
 
 <!DOCTYPE html>
@@ -72,60 +118,131 @@ $questions = $_SESSION['selected_questions'];
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Input Security Answers</title>
     <link rel="stylesheet" href="../css/main.index.css">
+    <link rel="stylesheet" href="../css/modal.css">
     <style>
-        .card {
+        .answers-card {
             max-width: 600px;
             margin: 50px auto;
-            padding: 20px;
-            border: 1px solid #ccc;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            padding: 30px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .answers-card h2 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .answers-card p {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
         }
         .form-group {
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }
-        label {
+        .form-group label {
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
         }
-        input {
+        .form-group input {
             width: 100%;
-            padding: 8px;
-            border: 1px solid #ccc;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
             border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
         }
-        button {
+        .form-group input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+        }
+        .btn-submit {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             background-color: #007bff;
             color: white;
             border: none;
             border-radius: 4px;
+            font-size: 16px;
+            font-weight: 600;
             cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 10px;
         }
-        button:hover {
+        .btn-submit:hover {
             background-color: #0056b3;
+        }
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .back-link a {
+            color: #007bff;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        .back-link a:hover {
+            color: #0056b3;
+            text-decoration: underline;
+        }
+        .question-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .info-text {
+            background-color: #e7f3ff;
+            border-left: 4px solid #007bff;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #333;
         }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h2>Provide Answers to Your Security Questions</h2>
+    <div class="answers-card">
+        <h2>Answer Your Security Questions</h2>
+        <div class="info-text">
+            Provide answers that only you would know. These answers are case-insensitive but must be exact matches.
+        </div>
+        
+        <?php if ($message): ?>
+            <div class="alert alert-<?php echo $message_type; ?>">
+                <?php echo htmlspecialchars($message); ?>
+            </div>
+        <?php endif; ?>
+        
         <form action="input_security_question.php" method="post">
             <div class="form-group">
+                <div class="question-label">Question 1:</div>
                 <label><?php echo htmlspecialchars($questions['q1']); ?></label>
-                <input type="text" name="answers[a1]" required>
+                <input type="text" name="answers[a1]" required placeholder="Your answer">
             </div>
             <div class="form-group">
+                <div class="question-label">Question 2:</div>
                 <label><?php echo htmlspecialchars($questions['q2']); ?></label>
-                <input type="text" name="answers[a2]" required>
+                <input type="text" name="answers[a2]" required placeholder="Your answer">
             </div>
             <div class="form-group">
+                <div class="question-label">Question 3:</div>
                 <label><?php echo htmlspecialchars($questions['q3']); ?></label>
-                <input type="text" name="answers[a3]" required>
+                <input type="text" name="answers[a3]" required placeholder="Your answer">
             </div>
-            <button type="submit">Save Security Questions</button>
+            <button type="submit" class="btn-submit">Save Security Answers</button>
         </form>
+        
+        <div class="back-link">
+            <a href="security_question.php">← Back to Security Questions</a>
+        </div>
     </div>
+
+    <script src="../jsform/modal.js"></script>
 </body>
 </html>
