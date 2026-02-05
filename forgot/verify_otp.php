@@ -10,7 +10,7 @@ session_start();
 require_once '../regform/config.php';
 
 // configurable block duration (minutes)
-$blockDuration = 10;
+$blockDuration = 1;
 
 if (!isset($_SESSION['reset_email'])) {
     header('Location: forgot_password.php');
@@ -202,7 +202,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $blocked_until = date('Y-m-d H:i:s', strtotime('+1 minutes'));
                 $conn->query("UPDATE password_resets SET is_blocked = 1, blocked_until = '$blocked_until' WHERE email = '$email'");
                 
-                $remainingTime = 10;
+                $remainingTime = 1;
                 $message = "Maximum resend attempts exceeded. Email blocked for $remainingTime minutes.";
                 $message_type = 'error';
                 $show_modal = true;
