@@ -25,80 +25,8 @@ $modal_title = '';
 $modal_message = '';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Handle resend first to avoid accidental OTP submission being treated as resend
-    if (isset($_POST['resend'])) {
-        // Resend OTP handling
-        // Get latest OTP record to check resend count
-        $stmt = $conn->prepare("SELECT resend_count, is_blocked, blocked_until FROM password_resets WHERE email = ? ORDER BY created_at DESC LIMIT 1");
-        $stmt->bind_param('s', $email);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        if ($result->num_rows > 0) {
-            $reset = $result->fetch_assoc();
-            
-            // Check if email is blocked
-            if ($reset['is_blocked'] && strtotime($reset['blocked_until']) > time()) {
-                $remainingTime = ceil((strtotime($reset['blocked_until']) - time()) / 60);
-                $message = "Email blocked. Try again in $remainingTime minute(s).";
-                $message_type = 'error';
-            } 
-            // Check if max resend reached (allow 2 resends)
-            elseif ($reset['resend_count'] >= 2) {
-                // Block email for configured minutes
-                $blocked_until = date('Y-m-d H:i:s', strtotime('+' . $blockDuration . ' minutes'));
-                $conn->query("UPDATE password_resets SET is_blocked = 1, blocked_until = '$blocked_until' WHERE email = '$email'");
-                
-                $remainingTime = $blockDuration;
-                $message = "Maximum resend attempts exceeded. Email blocked for $remainingTime minutes.";
-                $message_type = 'error';
-                $show_modal = true;
-                $modal_title = 'Maximum Resend Exceeded';
-                $modal_message = "You have exceeded the maximum number of OTP resends. Please try again in $remainingTime minutes.";
-            } 
-            else {
-                // Generate new OTP
-                $new_otp = rand(100000, 999999);
-                $expires_at = date('Y-m-d H:i:s', strtotime('+3 minutes'));
-                $newResendCount = $reset['resend_count'] + 1;
-                
-                // Delete old record and create new one
-                $conn->query("DELETE FROM password_resets WHERE email = '$email'");
-                
-                $stmt = $conn->prepare("INSERT INTO password_resets (email, otp, otp_attempts, resend_count, expires_at, last_resend_time) VALUES (?, ?, 0, ?, ?, NOW())");
-                $stmt->bind_param('ssss', $email, $new_otp, $newResendCount, $expires_at);
-                
-                if ($stmt->execute()) {
-                    // Send OTP via email
-                    $mail = new PHPMailer(true);
-                    try {
-                        $mail->isSMTP();
-                        $mail->Host       = 'smtp.gmail.com';
-                        $mail->SMTPAuth   = true;
-                        $mail->Username   = 'johnreyherobind@gmail.com';
-                        $mail->Password   = 'jvxaikgbsyjbpixo';
-                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-                        $mail->Port       = 587;
-
-                        $mail->setFrom('johnreyherobind@gmail.com', 'Security System');
-                        $mail->addAddress($email);
-
-                        $mail->isHTML(true);
-                        $mail->Subject = 'New Password Reset OTP';
-                        $mail->Body    = "Your new OTP for password reset is: <b>$new_otp</b>. It expires in 3 minutes.";
-
-                        $mail->send();
-                        
-                        $_SESSION['last_resend_time'] = time();
-                        $_SESSION['otp_resend_success'] = true;
-                    } catch (Exception $e) {
-                        $_SESSION['otp_resend_success'] = false;
-                    }
-                }
-            }
-        }
-    }
-    elseif (isset($_POST['otp'])) {
+    // Handle POST actions (resend or verify OTP)
+    if (isset($_POST['otp'])) {
         $otp = trim($_POST['otp']);
         
         // Get latest OTP record
@@ -220,9 +148,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 
                 $stmt = $conn->prepare("INSERT INTO password_resets (email, otp, otp_attempts, resend_count, expires_at, last_resend_time) VALUES (?, ?, 0, ?, ?, NOW())");
                 $stmt->bind_param('ssss', $email, $new_otp, $newResendCount, $expires_at);
-                
+
                 if ($stmt->execute()) {
-                    // Send OTP via email
                     $mail = new PHPMailer(true);
                     try {
                         $mail->isSMTP();
@@ -241,23 +168,41 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $mail->Body    = "Your new OTP for password reset is: <b>$new_otp</b>. It expires in 3 minutes.";
 
                         $mail->send();
-                        
+
+                        // mark last resend time
                         $_SESSION['last_resend_time'] = time();
-                        $_SESSION['otp_resend_success'] = true;
+
+                        if ((int)$newResendCount >= 2) {
+                            $_SESSION['resend_limit_reached'] = true;
+                            $message = 'OTP resent. Maximum resend attempts exceeded. Resend disabled.';
+                            $message_type = 'info';
+                        } else {
+                            $_SESSION['resend_limit_reached'] = false;
+                            $message = 'OTP resent. You can resend again after 60 seconds.';
+                            $message_type = 'info';
+                        }
                     } catch (Exception $e) {
                         $_SESSION['otp_resend_success'] = false;
+                        $message = 'Failed to send OTP. Please try again.';
+                        $message_type = 'error';
                     }
+                } else {
+                    $message = 'Failed to create OTP record. Please try again.';
+                    $message_type = 'error';
+                }
                 }
             }
         }
     }
-}
 
 // Check if last resend was recent for cooldown
 $lastResendTime = $_SESSION['last_resend_time'] ?? 0;
 $timeSinceResend = time() - $lastResendTime;
 $canResend = $timeSinceResend >= 60;
 $resendCooldown = max(0, 60 - $timeSinceResend);
+
+// If user already used their allowed resend, reflect that
+$resend_limit_reached = $_SESSION['resend_limit_reached'] ?? false;
 ?>
 
 <!DOCTYPE html>
@@ -417,7 +362,7 @@ $resendCooldown = max(0, 60 - $timeSinceResend);
             
             <div class="btn-group">
                 <button type="submit" class="btn-submit" id="submitBtn" <?php echo ($show_modal ? 'disabled' : ''); ?>>Verify OTP</button>
-                <button type="button" class="btn-resend" id="resendBtn" <?php echo ($show_modal || !$canResend ? 'disabled' : ''); ?> onclick="submitResend()">Resend OTP</button>
+                <button type="button" class="btn-resend" id="resendBtn" <?php echo ($show_modal || !$canResend || $resend_limit_reached ? 'disabled' : ''); ?> onclick="submitResend()">Resend OTP</button>
             </div>
             
             <div id="cooldownDisplay" style="display: none;" class="resend-cooldown">
@@ -526,14 +471,9 @@ $resendCooldown = max(0, 60 - $timeSinceResend);
         ]);
         <?php endif; ?>
 
-        // Check if resend was successful
-        <?php if (isset($_SESSION['otp_resend_success'])): ?>
-            <?php if ($_SESSION['otp_resend_success']): ?>
-                // Reload page to reset timer and show new OTP countdown
-                alert('OTP resent successfully! New timer started.');
-                location.reload();
-            <?php endif; ?>
-            <?php unset($_SESSION['otp_resend_success']); ?>
+        // If server indicated resend limit reached, show inline message (no alert)
+        <?php if (!empty($message)): ?>
+            // message handled inline above in PHP and shown as alert box; no JS alert to avoid duplicate submits
         <?php endif; ?>
 
         // OTP Input formatting (only numbers)
