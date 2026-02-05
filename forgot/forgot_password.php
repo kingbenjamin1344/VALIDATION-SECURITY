@@ -2,6 +2,7 @@
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
+
 require '../vendor/src/Exception.php';
 require '../vendor/src/PHPMailer.php';
 require '../vendor/src/SMTP.php';
@@ -11,6 +12,8 @@ require_once '../regform/config.php';
 
 $message = '';
 $message_type = '';
+$isBlocked = false;
+$blockedUntilTimestamp = null;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $email = trim($_POST['email']);
@@ -31,9 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if ($blockResult->num_rows > 0) {
             $blockData = $blockResult->fetch_assoc();
             if ($blockData['is_blocked'] && strtotime($blockData['blocked_until']) > time()) {
-                $remainingTime = ceil((strtotime($blockData['blocked_until']) - time()) / 60);
-                $message = "This email is blocked. Please try again in $remainingTime minute(s).";
-                $message_type = 'error';
+                $isBlocked = true;
+                $blockedUntilTimestamp = strtotime($blockData['blocked_until']) * 1000; // Convert to milliseconds for JS
             } else {
                 // Block has expired, proceed with new OTP
                 $canProceed = true;
@@ -148,6 +150,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             border-color: #007bff;
             box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
         }
+        .form-group input.blocked {
+            border-color: #dc3545;
+            background-color: #fff5f5;
+        }
+        .timer-message {
+            margin-top: 8px;
+            padding: 10px;
+            background-color: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            color: #856404;
+            font-size: 14px;
+            text-align: center;
+            font-weight: 500;
+            display: none;
+        }
+        .timer-message.active {
+            display: block;
+        }
         .btn-submit {
             width: 100%;
             padding: 12px;
@@ -160,8 +181,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             cursor: pointer;
             transition: background-color 0.3s;
         }
-        .btn-submit:hover {
+        .btn-submit:hover:not(:disabled) {
             background-color: #0056b3;
+        }
+        .btn-submit:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.65;
         }
         .back-link {
             text-align: center;
@@ -183,7 +209,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <h2>Forgot Password?</h2>
         <p>Enter your email address and we'll send you an OTP to reset your password.</p>
         
-        <?php if ($message): ?>
+        <?php if ($message && !$isBlocked): ?>
             <div class="alert alert-<?php echo $message_type; ?>">
                 <?php echo htmlspecialchars($message); ?>
             </div>
@@ -192,9 +218,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <form method="POST">
             <div class="form-group">
                 <label for="email">Email Address:</label>
-                <input type="email" name="email" id="email" required placeholder="Enter your email">
+                <input type="email" name="email" id="email" required placeholder="Enter your email" <?php echo $isBlocked ? 'class="blocked" disabled' : ''; ?>>
+                <?php if ($isBlocked): ?>
+                    <div class="timer-message active" id="timerMessage">
+                        This email is temporarily blocked. Please try again in <span id="timerCount">0:00</span>.
+                    </div>
+                <?php endif; ?>
             </div>
-            <button type="submit" class="btn-submit">Send OTP</button>
+            <button type="submit" class="btn-submit" <?php echo $isBlocked ? 'disabled' : ''; ?>>Send OTP</button>
         </form>
         
         <div class="back-link">
@@ -203,5 +234,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     </div>
 
     <script src="../jsform/modal.js"></script>
-</body>
-</html>
+    <script>
+        <?php if ($isBlocked && $blockedUntilTimestamp): ?>
+        const blockedUntil = <?php echo $blockedUntilTimestamp; ?>;
+        const emailInput = document.getElementById('email');
+        const timerMessage = document.getElementById('timerMessage');
+        const timerCount = document.getElementById('timerCount');
+        const submitBtn = document.querySelector('.btn-submit');
+
+        function updateTimer() {
+            const now = new Date().getTime();
+            const remaining = blockedUntil - now;
+
+            if (remaining <= 0) {
+                // Block has expired
+                emailInput.classList.remove('blocked');
+                emailInput.disabled = false;
+                timerMessage.classList.remove('active');
+                submitBtn.disabled = false;
+                clearInterval(timerInterval);
+            } else {
+                const totalSeconds = Math.ceil(remaining / 1000);
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+                timerCount.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }
+
+        updateTimer(); // Initial call
+        const timerInterval = setInterval(updateTimer, 1000);
+        <?php endif; ?>
+    </script>

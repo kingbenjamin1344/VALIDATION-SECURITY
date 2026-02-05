@@ -54,7 +54,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `id_no`, `firstname`, `middlename`, `lastname`, `suffix`, `sex`, `purok`, `barangay`, `municipality`, `province`, `country`, `zipcode`, `email`, `username`, `password`, `reenterpassword`, `birthdate`, `age`) VALUES
-(65, '1111-1111', 'Benjamin', 'E', 'Abamonga', 'jr', 'male', 'Purok-5', 'Marcos', 'Magallanes', 'Agusan Del Norte', 'Philippines', '8604', 'kingbenjamintheancient@gmail.com', 'kingbenjamin', '$2y$10$61dGgiadHBxclz6PRvjeO..hN062xndwUvB./G4tKt3UyBwXrAdEO', '', '2000-01-04', 24),
+(65, '1111-1111', 'Benjamin', 'E', 'Abamonga', 'jr', 'male', 'Purok-5', 'Marcos', 'Magallanes', 'Agusan Del Norte', 'Philippines', '8604', 'example@example.com', 'kingbenjamin', '$2y$10$61dGgiadHBxclz6PRvjeO..hN062xndwUvB./G4tKt3UyBwXrAdEO', '', '2000-01-04', 24),
 (80, '1111-1114', 'Johan Rey Excel', 'B', 'Liebert', '', 'male', 'Purok-5', 'Marcos', 'Magallanes', 'Agusan Del Norte', 'Germany', '7670', 'johnreyexcel@gmail.com', 'johnrey.rementizo', '$2y$10$u7NRe3eB/NqK8l2sZTuOPOQKoH5FkaXFrl.DTSGSZTvBO9HbuQye.', '', '2023-10-24', 0),
 (81, '1224-9974', 'John', '', 'Rebfxgjs', 'Sr.', 'female', 'Examples', 'Examples', 'Examples', 'Examples', 'Examples', '4500', 'johnrey@gmail.com', 'johnyuri', '$2y$10$ToBkUlfh1ve07uGhDXwCueUXNhov52cqWqDLnqf2mIPoTPxq2TuNy', '', '1989-02-07', 35);
 
