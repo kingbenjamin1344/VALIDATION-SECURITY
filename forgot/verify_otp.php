@@ -371,7 +371,7 @@ $resend_limit_reached = $_SESSION['resend_limit_reached'] ?? false;
         </form>
         
         <div class="back-link">
-            <a href="forgot_password.php">← Request Different Email</a>
+            <a href="forgot_password.php?clear=1">← Go Back</a>
         </div>
     </div>
 
@@ -426,8 +426,13 @@ $resend_limit_reached = $_SESSION['resend_limit_reached'] ?? false;
         let resendCooldown = <?php echo $resendCooldown; ?>;
         const cooldownDisplay = document.getElementById('cooldownDisplay');
         const cooldownTimer = document.getElementById('cooldownTimer');
+        const resendLimitReached = <?php echo $resend_limit_reached ? 'true' : 'false'; ?>;
 
-        if (resendCooldown > 0) {
+        // If server indicates resend permanently disabled, ensure UI reflects that (no cooldown shown)
+        if (resendLimitReached) {
+            cooldownDisplay.style.display = 'none';
+            resendBtn.disabled = true;
+        } else if (resendCooldown > 0) {
             cooldownDisplay.style.display = 'block';
             resendBtn.disabled = true;
             
@@ -438,7 +443,8 @@ $resend_limit_reached = $_SESSION['resend_limit_reached'] ?? false;
                 if (resendCooldown <= 0) {
                     clearInterval(cooldownInterval);
                     cooldownDisplay.style.display = 'none';
-                    resendBtn.disabled = false;
+                    // Only enable resend if server-side flag still allows it
+                    if (!resendLimitReached) resendBtn.disabled = false;
                 }
             }, 1000);
         }

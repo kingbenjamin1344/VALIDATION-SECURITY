@@ -10,6 +10,14 @@ require '../vendor/src/SMTP.php';
 session_start();
 require_once '../regform/config.php';
 
+// If user requested to clear previous flow (e.g., came from verify page), reset resend/session flags
+if (isset($_GET['clear'])) {
+    unset($_SESSION['resend_limit_reached']);
+    unset($_SESSION['last_resend_time']);
+    unset($_SESSION['otp_resend_success']);
+    unset($_SESSION['reset_email']);
+}
+
 $message = '';
 $message_type = '';
 $isBlocked = false;
@@ -81,9 +89,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                     $mail->send();
                     
+                    // Clear any previous resend/session flags so this is a fresh flow
+                    unset($_SESSION['resend_limit_reached']);
+                    unset($_SESSION['last_resend_time']);
+                    unset($_SESSION['otp_resend_success']);
+
                     $_SESSION['reset_email'] = $email;
                     $_SESSION['otp_sent'] = true;
-                    
+
                     // Redirect immediately to OTP verification page
                     header('Location: verify_otp.php');
                     exit();
