@@ -166,7 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <p>Enter your new password below.</p>
         </div>
         
-        <?php if ($message): ?>
+        <?php if ($message && empty($show_success_modal)): ?>
             <div class="alert alert-<?php echo $message_type; ?>">
                 <?php echo htmlspecialchars($message); ?>
             </div>
@@ -212,80 +212,80 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <!-- Success Modal -->
     <div id="successModal" class="modal">
         <div class="modal-content">
-            <script>
-                // Password strength and match indicator using your register.js logic
-                const newPasswordInput = document.getElementById('new_password');
-                const confirmPasswordInput = document.getElementById('confirm_password');
-                const submitBtn = document.getElementById('submitBtn');
-                const pwStrengthMessage = document.getElementById('pwStrengthMessage');
-                const pwMatchMessage = document.getElementById('pwMatchMessage');
+            <div class="modal-header">
+                <h2 id="successModalTitle"></h2>
+            </div>
+            <div class="modal-body">
+                <p id="successModalMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn btn-primary" id="gotoLoginBtn">Go to Login</button>
+            </div>
+        </div>
+    </div>
 
-                function evaluatePassword() {
-                    const password = newPasswordInput.value;
-                    const reenterpassword = confirmPasswordInput.value;
+    <script src="../jsform/modal.js"></script>
+    <script>
+        // Password strength and match indicator (moved out of modal)
+        (function(){
+            const newPasswordInput = document.getElementById('new_password');
+            const confirmPasswordInput = document.getElementById('confirm_password');
+            const submitBtn = document.getElementById('submitBtn');
+            const pwStrengthMessage = document.getElementById('pwStrengthMessage');
+            const pwMatchMessage = document.getElementById('pwMatchMessage');
 
-                    if (password.length === 0) {
-                        pwStrengthMessage.textContent = '';
-                        newPasswordInput.classList.remove('password-weak','password-medium','password-strong');
-                    } else if (password.length < 8) {
-                        pwStrengthMessage.textContent = 'Your password is weak';
-                        pwStrengthMessage.className = 'pw-message weak';
-                        newPasswordInput.classList.add('password-weak');
-                        newPasswordInput.classList.remove('password-medium','password-strong');
+            function evaluatePassword() {
+                const password = newPasswordInput.value;
+                const reenterpassword = confirmPasswordInput.value;
+
+                if (password.length === 0) {
+                    pwStrengthMessage.textContent = '';
+                    newPasswordInput.classList.remove('password-weak','password-medium','password-strong');
+                } else if (password.length < 8) {
+                    pwStrengthMessage.textContent = 'Your password is weak';
+                    pwStrengthMessage.className = 'pw-message weak';
+                    newPasswordInput.classList.add('password-weak');
+                    newPasswordInput.classList.remove('password-medium','password-strong');
+                } else {
+                    const hasNumber = /\d/.test(password);
+                    const hasSymbol = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+                    if (hasNumber && hasSymbol) {
+                        pwStrengthMessage.textContent = 'Your password is strong';
+                        pwStrengthMessage.className = 'pw-message strong';
+                        newPasswordInput.classList.add('password-strong');
+                        newPasswordInput.classList.remove('password-weak','password-medium');
                     } else {
-                        const hasNumber = /\d/.test(password);
-                        const hasSymbol = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-                        if (hasNumber && hasSymbol) {
-                            pwStrengthMessage.textContent = 'Your password is strong';
-                            pwStrengthMessage.className = 'pw-message strong';
-                            newPasswordInput.classList.add('password-strong');
-                            newPasswordInput.classList.remove('password-weak','password-medium');
-                        } else {
-                            pwStrengthMessage.textContent = 'Your password is moderate';
-                            pwStrengthMessage.className = 'pw-message moderate';
-                            newPasswordInput.classList.add('password-medium');
-                            newPasswordInput.classList.remove('password-weak','password-strong');
-                        }
-                    }
-
-                    // Match check
-                    if (reenterpassword.length === 0) {
-                        pwMatchMessage.textContent = '';
-                        pwMatchMessage.className = 'pw-message';
-                    } else if (password === reenterpassword) {
-                        pwMatchMessage.textContent = 'Password matched.';
-                        pwMatchMessage.className = 'pw-message strong';
-                        submitBtn.disabled = false;
-                    } else {
-                        pwMatchMessage.textContent = 'Password not matched';
-                        pwMatchMessage.className = 'pw-message weak';
-                        submitBtn.disabled = true;
-                    }
-
-                    // If both non-empty and matched, ensure submit enabled
-                    if (password.length > 0 && reenterpassword.length > 0 && password === reenterpassword) {
-                        submitBtn.disabled = false;
+                        pwStrengthMessage.textContent = 'Your password is moderate';
+                        pwStrengthMessage.className = 'pw-message moderate';
+                        newPasswordInput.classList.add('password-medium');
+                        newPasswordInput.classList.remove('password-weak','password-strong');
                     }
                 }
 
-                newPasswordInput.addEventListener('input', evaluatePassword);
-                confirmPasswordInput.addEventListener('input', evaluatePassword);
+                // Match check
+                if (reenterpassword.length === 0) {
+                    pwMatchMessage.textContent = '';
+                    pwMatchMessage.className = 'pw-message';
+                } else if (password === reenterpassword) {
+                    pwMatchMessage.textContent = 'Password matched.';
+                    pwMatchMessage.className = 'pw-message strong';
+                    submitBtn.disabled = false;
+                } else {
+                    pwMatchMessage.textContent = 'Password not matched';
+                    pwMatchMessage.className = 'pw-message weak';
+                    submitBtn.disabled = true;
+                }
 
-                // initialize
-                evaluatePassword();
-            </script>
-            if (isMet) {
-                li.classList.add('checked');
-                element.textContent = '✓';
-            } else {
-                li.classList.remove('checked');
-                element.textContent = '●';
+                // If both non-empty and matched, ensure submit enabled
+                if (password.length > 0 && reenterpassword.length > 0 && password === reenterpassword) {
+                    submitBtn.disabled = false;
+                }
             }
-        }
-        
-        // Listen for input changes
-        newPasswordInput.addEventListener('input', updatePasswordStrength);
-        confirmPasswordInput.addEventListener('input', updatePasswordStrength);
+
+            newPasswordInput.addEventListener('input', evaluatePassword);
+            confirmPasswordInput.addEventListener('input', evaluatePassword);
+            evaluatePassword();
+        })();
     </script>
     <script>
         // Show success modal if password was reset
@@ -295,18 +295,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 {
                     text: 'Go to Login',
                     class: 'btn-primary',
-                    onclick: () => { window.location.href = '../logform/login.php'; }
+                    onclick: function(){ window.location.href = '../logform/login.php'; }
                 }
             ]);
         <?php endif; ?>
-        
-        // Also attach button in markup if JS needs to handle
-        const gotoLoginBtn = document.getElementById('gotoLoginBtn');
-        if (gotoLoginBtn) {
-            gotoLoginBtn.addEventListener('click', () => {
-                window.location.href = '../logform/login.php';
-            });
-        }
+
+        // Attach button handler to redirect to login
+        (function(){
+            const gotoLoginBtn = document.getElementById('gotoLoginBtn');
+            if (gotoLoginBtn) {
+                gotoLoginBtn.addEventListener('click', () => {
+                    window.location.href = '../logform/login.php';
+                });
+            }
+        })();
     </script>
 </body>
 </html>
