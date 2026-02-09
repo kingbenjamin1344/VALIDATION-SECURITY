@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard</title>
     <link rel="stylesheet" href="../css/main.index.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
     <style>
         body {
             margin: 0;
@@ -62,6 +64,15 @@
             box-sizing: border-box;
             z-index: 999;
             gap: 18px;
+        }
+
+        .navbar-title {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 20px;
+            font-weight: bold;
+            color: white;
         }
 
         .settings-icon,
@@ -157,10 +168,6 @@
             font-size: 18px;
         }
 
-        .sidebar ul li a:hover {
-            text-decoration: underline;
-        }
-
         .sidebar .close-btn {
             position: absolute;
             top: 10px;
@@ -181,53 +188,108 @@
             padding: 10px 0;
         }
 
-        #footer p {
+        /* ================= MODAL ================= */
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(6px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .modal-box {
+            background: white;
+            padding: 25px 30px;
+            border-radius: 12px;
+            width: 320px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+            animation: scaleIn 0.25s ease;
+        }
+
+        .modal-box h3 {
             margin: 0;
-            position: relative;
-            top: -4px;
+            color: #1E90FF;
+        }
+
+        .modal-box p {
+            margin: 15px 0 25px;
+            color: #555;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-confirm {
+            flex: 1;
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .btn-confirm:hover {
+            background: #218838;
+        }
+
+        .btn-cancel {
+            flex: 1;
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .btn-cancel:hover {
+            background: #c82333;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0.9);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
     </style>
 </head>
+
 <body>
 
     <!-- Left Sidebar -->
     <div class="left-sidebar">
         <ul>
-            <li><a href="#">Dashboard</a></li>
-            <li><a href="#">Add Account</a></li>
-            <li><a href="#">Employee List</a></li>
+            <li><a href="../logform/indexes.php">Dashboard</a></li>
+            <li><a href="../logform/addaccount.php">Add Account</a></li>
+            <li><a href="../logform/employeelist.php">Employee List</a></li>
         </ul>
     </div>
 
     <!-- Top Navbar -->
     <div class="top-navbar">
-        <span class="logout-icon" onclick="logout()" title="Logout">⏻</span>
-        <span class="settings-icon" onclick="toggleSidebar()" title="Settings">&#9881;</span>
+        <span class="settings-icon" onclick="toggleSidebar()">&#9881;</span>
+        <div class="navbar-title">Leave Management</div>
+        <span class="logout-icon" onclick="logout()">
+            <i class="fa-solid fa-right-from-bracket"></i>
+        </span>
     </div>
 
     <!-- Main Content -->
     <main>
-        <div class="cards">
-            <div class="card">
-                <h2>120</h2>
-                <p>Total Employees</p>
-            </div>
-
-            <div class="card">
-                <h2>8</h2>
-                <p>Pending Leaves</p>
-            </div>
-
-            <div class="card">
-                <h2>15</h2>
-                <p>Approved Leaves</p>
-            </div>
-
-            <div class="card">
-                <h2>3</h2>
-                <p>Declined Requests</p>
-            </div>
-        </div>
+      
     </main>
 
     <!-- Right Sidebar -->
@@ -244,15 +306,33 @@
         <p>@South Loan & Finance Company Inc. 2024</p>
     </div>
 
+    <!-- Logout Modal -->
+    <div id="logoutModal" class="modal-overlay">
+        <div class="modal-box">
+            <h3>Confirm Logout</h3>
+            <p>Are you sure you want to logout?</p>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeLogoutModal()">Cancel</button>
+                <button class="btn-confirm" onclick="confirmLogout()">Yes</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         function toggleSidebar() {
             document.getElementById('sidebar').classList.toggle('open');
         }
 
         function logout() {
-            if (confirm("Are you sure you want to logout?")) {
-                window.location.href = "logout.php";
-            }
+            document.getElementById('logoutModal').style.display = "flex";
+        }
+
+        function closeLogoutModal() {
+            document.getElementById('logoutModal').style.display = "none";
+        }
+
+        function confirmLogout() {
+            window.location.href = "logout.php";
         }
     </script>
 
