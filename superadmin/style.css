@@ -1,0 +1,27 @@
+/* Shared superadmin styles */
+:root{--bg:#f3f6f9;--primary:#1e90ff;--sidebar:#2196f3;--accent:#0b74de;--danger:#dc3545}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:#111}
+/* Top header */
+.topbar{position:fixed;left:0;right:0;top:0;height:64px;background:var(--primary);display:flex;align-items:center;z-index:30}
+.topbar .inner{width:100%;display:flex;align-items:center;justify-content:center;position:relative}
+.topbar .title{color:#fff;font-weight:700}
+.topbar .actions{position:absolute;right:18px;top:12px}
+.topbar .actions a{color:#fff;text-decoration:none;margin-left:10px}
+
+/* Left sidebar below header */
+.sidebar{position:fixed;left:0;top:64px;bottom:0;width:180px;background:var(--sidebar);color:#fff;padding:22px 12px}
+.sidebar h3{margin:0 0 12px;font-size:16px}
+.sidebar a{color:#fff;display:block;padding:12px;border-radius:4px;text-decoration:none;margin-bottom:6px}
+.sidebar a:hover{background:rgba(0,0,0,0.08)}
+
+.main{margin-left:200px;padding:18px;margin-top:80px}
+.card{background:#fff;padding:16px;border-radius:6px;border:1px solid #e5e7eb;min-height:520px}
+table{width:100%;border-collapse:collapse;margin-top:12px}
+th,td{padding:10px;border:1px solid #e5e7eb;text-align:left}
+.btn{display:inline-block;padding:6px 10px;background:var(--accent);color:#fff;text-decoration:none;border-radius:4px}
+.btn.danger{background:var(--danger)}
+.form-row{margin:8px 0}
+label{display:block;margin-bottom:6px;font-weight:600}
+input[type=text],input[type=password],input[type=email],select{width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:4px}
+.center-box{max-width:420px;margin:80px auto;padding:24px;background:#fff;border:1px solid #ddd;border-radius:6px}
+.muted{color:#6b7280}

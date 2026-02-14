@@ -343,17 +343,17 @@ if (age < 18) {
 
 /////////////////////////////////////////////////Simple Restrictions*****************************************************************************************************
 ///////////////////////////////////////////////////Enail***********************************************************************************************************
-
+if(email.trim()===""){
+    alert("Error: email  Cannot Be Empty");
+   return false;
+}
 
 if ( email.length < 15) {
     errorMessageemail.innerHTML = "must exceed 15 character ";
     return false; // Prevent form submission
  }
   
-if(email.trim()===""){
-    alert("Error: email  Cannot Be Empty");
-   return false;
-}
+
  // if ( email.length > 30) {
 //    errorMessageemail.innerHTML = "must not exceed 30 character ";
 //    return false; // Prevent form submission
