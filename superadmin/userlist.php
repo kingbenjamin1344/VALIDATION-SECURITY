@@ -71,11 +71,12 @@ if ($res) {
         <header class="header"><div class="title">User List</div></header>
         <div class="container">
             <div class="panel">
+                 <h3>Employee List</h3>
                 <?php if ($message): ?><div class="msg"><?=htmlspecialchars($message)?></div><?php endif; ?>
                 <table>
                     <thead>
                         <tr>
-                            <th>ID</th>
+                            
                             <th>ID No</th>
                             <th>Full Name</th>
                             <th>Username</th>
@@ -90,7 +91,7 @@ if ($res) {
                         <?php else: ?>
                             <?php foreach ($users as $u): ?>
                                 <tr>
-                                    <td><?=htmlspecialchars($u['id'])?></td>
+                                    
                                     <td><?=htmlspecialchars($u['id_no'])?></td>
                                     <td><?=htmlspecialchars(trim($u['firstname'].' '.$u['middlename'].' '.$u['lastname'].' '.$u['suffix']))?></td>
                                     <td><?=htmlspecialchars($u['username'])?></td>
