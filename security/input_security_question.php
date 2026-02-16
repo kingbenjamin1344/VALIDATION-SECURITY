@@ -222,17 +222,17 @@ $questions = $_SESSION['selected_questions'] ?? [];
         <form action="input_security_question.php" method="post">
             <div class="form-group">
                 <div class="question-label">Question 1:</div>
-                <label><?php echo htmlspecialchars($questions['q1']); ?></label>
+                
                 <input type="text" name="answers[a1]" required placeholder="Your answer">
             </div>
             <div class="form-group">
                 <div class="question-label">Question 2:</div>
-                <label><?php echo htmlspecialchars($questions['q2']); ?></label>
+                
                 <input type="text" name="answers[a2]" required placeholder="Your answer">
             </div>
             <div class="form-group">
                 <div class="question-label">Question 3:</div>
-                <label><?php echo htmlspecialchars($questions['q3']); ?></label>
+                
                 <input type="text" name="answers[a3]" required placeholder="Your answer">
             </div>
             <button type="submit" class="btn-submit">Save Security Answers</button>

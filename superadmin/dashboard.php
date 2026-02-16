@@ -1,3 +1,7 @@
+<?php
+session_start();
+$role = $_SESSION['role'] ?? 'superadmin';
+?>
 <!doctype html>
 <html lang="en">
 <head>
@@ -11,6 +15,9 @@
         .app{display:flex;min-height:100vh}
         /* left nav */
         .sidebar{width:220px;background:var(--nav-blue);color:#fff;padding:28px 18px 18px}
+        .role-area{ text-align:center; padding:8px 0 16px }
+        .role-circle-small{ width:48px; height:48px; border-radius:50%; background:#fff; color:var(--nav-blue); display:inline-flex; align-items:center; justify-content:center; font-weight:700; margin:0 auto 8px }
+        .role-label-small{ color:#fff; font-size:13px; text-transform:capitalize }
         .brand{font-weight:600;font-size:18px;margin-bottom:28px}
         .nav{display:flex;flex-direction:column;gap:12px}
         .nav a{color:#fff;text-decoration:none;padding:10px 12px;border-radius:6px;display:block}
@@ -33,6 +40,10 @@
 <div class="app">
     <aside class="sidebar">
         <div class="brand"></div>
+        <div class="role-area">
+            <div class="role-circle-small"><?=htmlspecialchars(strtoupper(substr($role,0,1)))?></div>
+            <div class="role-label-small"><?=htmlspecialchars($role)?></div>
+        </div>
         <nav class="nav">
             <a href="dashboard.php">Dashboard</a>
             <a href="addacc.php">Add Account</a>

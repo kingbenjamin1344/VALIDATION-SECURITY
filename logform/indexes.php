@@ -1,3 +1,22 @@
+<?php
+session_start();
+$displayName = '';
+$role = $_SESSION['role'] ?? 'user';
+if (!empty($_SESSION['role'])) {
+    if ($_SESSION['role'] === 'superadmin') {
+        $displayName = $_SESSION['superadmin'] ?? '';
+    } elseif ($_SESSION['role'] === 'admin') {
+        $displayName = $_SESSION['admin']['fullname'] ?? $_SESSION['admin']['username'] ?? '';
+    } else {
+        $displayName = $_SESSION['username'] ?? $_SESSION['user']['username'] ?? '';
+    }
+}
+$initials = '';
+if ($displayName !== '') {
+    $parts = preg_split('/\s+/', trim($displayName));
+    $initials = strtoupper(substr($parts[0], 0, 1) . (isset($parts[1]) ? substr($parts[1], 0, 1) : ''));
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -31,6 +50,32 @@
             list-style: none;
             padding: 0;
             margin: 0;
+        }
+
+        .role-area {
+            text-align: center;
+            padding: 18px 12px;
+        }
+
+        .role-circle-small {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #ffffff;
+            color: #1E90FF;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+            margin-bottom: 6px;
+        }
+
+        .role-label-small {
+            color: #ffffff;
+            font-size: 13px;
+            text-transform: capitalize;
+            display: block;
         }
 
         .left-sidebar ul li {
@@ -86,6 +131,28 @@
         .logout-icon:hover {
             color: #ff4d4d;
             transform: scale(1.1);
+        }
+
+        /* Profile circle */
+        .profile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: white;
+            font-weight: 600;
+        }
+
+        .profile-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #ffffff;
+            color: #1E90FF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
         }
 
         .settings-icon:hover {
@@ -271,9 +338,15 @@
 
     <!-- Left Sidebar -->
     <div class="left-sidebar">
+        <div class="role-area">
+            <div class="role-circle-small"><?=
+                htmlspecialchars(strtoupper(substr($role,0,1)))
+            ?></div>
+            <div class="role-label-small"><?=htmlspecialchars($role)?></div>
+        </div>
         <ul>
-<li><a href="../logform/indexes.php">Dashboard</a></li>
-            <li><a href="">Request Leave</a></li>
+            <li><a href="../logform/indexes.php">Dashboard</a></li>
+            <li><a href="../logform/requestleave.php">Request Leave</a></li>
             <li><a href="">Leave History</a></li>
         </ul>
     </div>
@@ -282,6 +355,10 @@
     <div class="top-navbar">
         <span class="settings-icon" onclick="toggleSidebar()">&#9881;</span>
         <div class="navbar-title">Leave Management</div>
+        <div class="profile" aria-label="profile">
+            <div class="profile-circle"><?=htmlspecialchars($initials)?></div>
+            <div class="profile-name"><?=htmlspecialchars($displayName)?></div>
+        </div>
         <span class="logout-icon" onclick="logout()">
             <i class="fa-solid fa-right-from-bracket"></i>
         </span>
