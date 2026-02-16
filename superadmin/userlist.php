@@ -68,7 +68,7 @@ if ($res) {
         </nav>
     </aside>
     <div class="content">
-        <header class="header"><div class="title">User List</div></header>
+        <header class="header"><div class="title">Leave Management</div></header>
         <div class="container">
             <div class="panel">
                  <h3>Employee List</h3>

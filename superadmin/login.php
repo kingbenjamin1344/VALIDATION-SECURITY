@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/credentials.php';
+require_once __DIR__ . '/../regform/config.php';
 
 if (isset($_SESSION['superadmin'])) {
     header('Location: dashboard.php');
@@ -14,6 +15,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($username === DEFAULT_SUPERADMIN_USER && $password === DEFAULT_SUPERADMIN_PASSWORD) {
         $_SESSION['superadmin'] = $username;
+        // log superadmin login (uses helper to handle different schemas)
+        $device = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
+        if (function_exists('insert_activity')) insert_activity($conn, $username, 'superadmin', 'login', $device);
         header('Location: dashboard.php');
         exit;
     } else {

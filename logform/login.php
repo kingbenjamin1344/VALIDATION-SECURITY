@@ -50,6 +50,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if (password_verify($password, $row["password"])) {
                 $_SESSION["username"] = $username;
                 resetLoginAttempts(true);
+                // insert activity log: user login (uses helper to handle different schemas)
+                $device = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
+                $uname = $username;
+                if (function_exists('insert_activity')) insert_activity($conn, $uname, 'user', 'login', $device);
 
                 // Redirect to a different page after successful login
                 header('Location: indexes.php');
@@ -137,7 +141,7 @@ echo '<script>
             <h1 class="logo">Leave Management System</h1>
             <nav>
                 <ul>
-                    <li><a href="../logform/login.php">Home</a></li>
+                    <li><a href="../admin/login.php">Admin</a></li>
                     <li><a href="../regform/register.php">Register</a></li>
                 </ul>
             </nav>
