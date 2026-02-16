@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../regform/config.php'; // Assuming you have the database configuration here
+require_once __DIR__ . '/../superadmin/credentials.php';
 
 
 
@@ -12,8 +13,8 @@ $countdown_durations = [15, 30, 60]; // Durations for each failed attempt set
 
 // Check if the login form has been submitted
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $username = $_POST["username"];
-    $password = $_POST["password"];
+    $username = trim($_POST["username"] ?? '');
+    $password = $_POST["password"] ?? '';
 
     // Check if cooldown is active
     if (isset($_SESSION['cooldown_start_time'])) {
@@ -45,24 +46,81 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             die('Error executing statement: ' . $stmt->error);
         }
 
-        if ($result->num_rows > 0) {
-            $row = $result->fetch_assoc();
-            if (password_verify($password, $row["password"])) {
-                $_SESSION["username"] = $username;
-                resetLoginAttempts(true);
-                // insert activity log: user login (uses helper to handle different schemas)
-                $device = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
-                $uname = $username;
-                if (function_exists('insert_activity')) insert_activity($conn, $uname, 'user', 'login', $device);
+        // First, check if credentials match default superadmin
+        if ($username === (defined('DEFAULT_SUPERADMIN_USER') ? DEFAULT_SUPERADMIN_USER : '') && $password === (defined('DEFAULT_SUPERADMIN_PASSWORD') ? DEFAULT_SUPERADMIN_PASSWORD : '')) {
+            // Superadmin authenticated (plain compare as per existing implementation)
+            $_SESSION['superadmin'] = $username;
+            $_SESSION['role'] = 'superadmin';
+            $device = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
+            if (function_exists('insert_activity')) insert_activity($conn, $username, 'superadmin', 'login', $device);
+            resetLoginAttempts(true);
+            header('Location: ../superadmin/dashboard.php');
+            exit();
+        }
 
-                // Redirect to a different page after successful login
-                header('Location: indexes.php');
-                exit();
+        // Next, check admins table
+        $stmtAdmin = $conn->prepare("SELECT id, fullname, username, password FROM admins WHERE username = ? LIMIT 1");
+        if ($stmtAdmin) {
+            $stmtAdmin->bind_param('s', $username);
+            $stmtAdmin->execute();
+            $resAdmin = $stmtAdmin->get_result();
+            if ($resAdmin && $resAdmin->num_rows > 0) {
+                $r = $resAdmin->fetch_assoc();
+                if (password_verify($password, $r['password'])) {
+                    $_SESSION['admin'] = ['id' => $r['id'], 'fullname' => $r['fullname'], 'username' => $r['username']];
+                    $_SESSION['role'] = 'admin';
+                    $device = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
+                    if (function_exists('insert_activity')) insert_activity($conn, $r['username'], 'admin', 'login', $device);
+                    resetLoginAttempts(true);
+                    header('Location: ../admin/dashboard.php');
+                    exit();
+                } else {
+                    handleFailedLogin();
+                    $stmtAdmin->close();
+                }
+            } else {
+                $stmtAdmin->close();
+
+                // Finally, check users table (regular users)
+                if ($result->num_rows > 0) {
+                    $row = $result->fetch_assoc();
+                    if (password_verify($password, $row["password"])) {
+                        $_SESSION["username"] = $username;
+                        $_SESSION['user'] = ['id' => $row['id'], 'username' => $username];
+                        $_SESSION['role'] = 'user';
+                        resetLoginAttempts(true);
+                        $device = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
+                        $uname = $username;
+                        if (function_exists('insert_activity')) insert_activity($conn, $uname, 'user', 'login', $device);
+                        header('Location: indexes.php');
+                        exit();
+                    } else {
+                        handleFailedLogin();
+                    }
+                } else {
+                    handleFailedLogin();
+                }
+            }
+        } else {
+            // If admin statement failed, fallback to checking users as before
+            if ($result->num_rows > 0) {
+                $row = $result->fetch_assoc();
+                if (password_verify($password, $row["password"])) {
+                    $_SESSION["username"] = $username;
+                    $_SESSION['user'] = ['id' => $row['id'], 'username' => $username];
+                    $_SESSION['role'] = 'user';
+                    resetLoginAttempts(true);
+                    $device = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
+                    $uname = $username;
+                    if (function_exists('insert_activity')) insert_activity($conn, $uname, 'user', 'login', $device);
+                    header('Location: indexes.php');
+                    exit();
+                } else {
+                    handleFailedLogin();
+                }
             } else {
                 handleFailedLogin();
             }
-        } else {
-            handleFailedLogin();
         }
 
         $stmt->close();

@@ -273,8 +273,8 @@
     <div class="left-sidebar">
         <ul>
 <li><a href="../logform/indexes.php">Dashboard</a></li>
-            <li><a href="../logform/addaccount.php">Add Account</a></li>
-            <li><a href="../logform/employeelist.php">Employee List</a></li>
+            <li><a href="">Request Leave</a></li>
+            <li><a href="">Leave History</a></li>
         </ul>
     </div>
 
