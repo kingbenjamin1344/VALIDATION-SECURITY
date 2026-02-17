@@ -31,9 +31,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $stmt->bind_param('s', $email);
     $stmt->execute();
     $result = $stmt->get_result();
+    $account_type = 'user';
+    $account_id = null;
     
     if ($result->num_rows > 0) {
         // Check if email is currently blocked
+        $userRow = $result->fetch_assoc();
+        $account_id = $userRow['id'];
         $checkBlock = $conn->prepare("SELECT is_blocked, blocked_until FROM password_resets WHERE email = ? ORDER BY created_at DESC LIMIT 1");
         $checkBlock->bind_param('s', $email);
         $checkBlock->execute();
@@ -95,6 +99,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     unset($_SESSION['otp_resend_success']);
 
                     $_SESSION['reset_email'] = $email;
+                    $_SESSION['reset_account_type'] = 'user';
+                    $_SESSION['reset_account_id'] = $account_id;
                     $_SESSION['otp_sent'] = true;
 
                     // Redirect immediately to OTP verification page
@@ -107,8 +113,81 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         }
     } else {
-        $message = 'Email not found in our system.';
-        $message_type = 'error';
+        // Not found in users; check admins table
+        $stmtA = $conn->prepare("SELECT id, email FROM admins WHERE email = ?");
+        $stmtA->bind_param('s', $email);
+        $stmtA->execute();
+        $resA = $stmtA->get_result();
+        if ($resA->num_rows > 0) {
+            $acct = $resA->fetch_assoc();
+            $account_type = 'admin';
+            $account_id = $acct['id'];
+
+            // proceed same as user flow: check block and create OTP
+            $checkBlock = $conn->prepare("SELECT is_blocked, blocked_until FROM password_resets WHERE email = ? ORDER BY created_at DESC LIMIT 1");
+            $checkBlock->bind_param('s', $email);
+            $checkBlock->execute();
+            $blockResult = $checkBlock->get_result();
+
+            if ($blockResult->num_rows > 0) {
+                $blockData = $blockResult->fetch_assoc();
+                if ($blockData['is_blocked'] && strtotime($blockData['blocked_until']) > time()) {
+                    $isBlocked = true;
+                    $blockedUntilTimestamp = strtotime($blockData['blocked_until']) * 1000;
+                } else {
+                    $canProceed = true;
+                }
+            } else {
+                $canProceed = true;
+            }
+
+            if ($canProceed) {
+                $otp = rand(100000, 999999);
+                $expires_at = date('Y-m-d H:i:s', strtotime('+3 minutes'));
+                $conn->query("DELETE FROM password_resets WHERE email = '$email'");
+                $stmt = $conn->prepare("INSERT INTO password_resets (email, otp, otp_attempts, resend_count, expires_at, created_at) VALUES (?, ?, 0, 0, ?, NOW())");
+                $stmt->bind_param('sss', $email, $otp, $expires_at);
+                if ($stmt->execute()) {
+                    $mail = new PHPMailer(true);
+                    try {
+                        $mail->isSMTP();
+                        $mail->Host       = 'smtp.gmail.com';
+                        $mail->SMTPAuth   = true;
+                        $mail->Username   = 'johnreyherobind@gmail.com';
+                        $mail->Password   = 'jvxaikgbsyjbpixo';
+                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                        $mail->Port       = 587;
+
+                        $mail->setFrom('johnreyherobind@gmail.com', 'Security System');
+                        $mail->addAddress($email);
+
+                        $mail->isHTML(true);
+                        $mail->Subject = 'Password Reset OTP';
+                        $mail->Body    = "Your OTP for password reset is: <b>$otp</b>. It expires in 3 minutes.";
+
+                        $mail->send();
+
+                        unset($_SESSION['resend_limit_reached']);
+                        unset($_SESSION['last_resend_time']);
+                        unset($_SESSION['otp_resend_success']);
+
+                        $_SESSION['reset_email'] = $email;
+                        $_SESSION['reset_account_type'] = 'admin';
+                        $_SESSION['reset_account_id'] = $account_id;
+                        $_SESSION['otp_sent'] = true;
+
+                        header('Location: verify_otp.php');
+                        exit();
+                    } catch (Exception $e) {
+                        $message = "Failed to send OTP. Please try again.";
+                        $message_type = 'error';
+                    }
+                }
+            }
+        } else {
+            $message = 'Email not found in our system.';
+            $message_type = 'error';
+        }
     }
 }
 ?>

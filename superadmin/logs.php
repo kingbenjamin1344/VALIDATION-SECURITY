@@ -1,6 +1,7 @@
 <?php
 session_start();
  $role = $_SESSION['role'] ?? 'superadmin';
+ $current = basename($_SERVER['PHP_SELF']);
 if (!isset($_SESSION['superadmin'])) { header('Location: login.php'); exit; }
 require_once __DIR__ . '/../regform/config.php';
 
@@ -52,14 +53,15 @@ if (isset($_GET['edit']) && intval($_GET['edit'])>0) {
         *{box-sizing:border-box}
         body{font-family:Inter,Arial,Helvetica,sans-serif;margin:0;background:var(--bg);color:#243042;overflow-x:hidden;padding-bottom:64px}
         .app{display:flex;min-height:100vh}
-        .sidebar{width:220px;background:var(--nav-blue);color:#fff;padding:28px 18px 18px}
-        .role-area{ text-align:center; padding:8px 0 16px }
+        .sidebar{width:220px;background:var(--nav-blue);color:#fff;padding:28px 0 18px}
+        .role-area{ text-align:center; padding:8px 18px 16px }
         .role-circle-small{ width:48px; height:48px; border-radius:50%; background:#fff; color:var(--nav-blue); display:inline-flex; align-items:center; justify-content:center; font-weight:700; margin:0 auto 8px }
         .role-label-small{ color:#fff; font-size:13px; text-transform:capitalize }
-        .brand{font-weight:600;font-size:18px;margin-bottom:28px}
+        .brand{font-weight:600;font-size:18px;margin-bottom:28px;padding:0 18px}
         .nav{display:flex;flex-direction:column;gap:12px}
-        .nav a{color:#fff;text-decoration:none;padding:10px 12px;border-radius:6px;display:block}
+        .nav a{color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;display:block;box-sizing:border-box;width:100%}
         .nav a:hover{background:rgba(255,255,255,0.08)}
+        .nav a.active{background:#063970;border-radius:6px}
         .content{flex:1;display:flex;flex-direction:column}
         .header{height:64px;background:var(--blue);color:#fff;display:flex;align-items:center;padding:0 24px;justify-content:center;position:relative}
         .logout-icon{position:absolute;right:24px;top:50%;transform:translateY(-50%);font-size:20px;cursor:pointer}
@@ -94,11 +96,11 @@ if (isset($_GET['edit']) && intval($_GET['edit'])>0) {
             <div class="role-label-small"><?=htmlspecialchars($role)?></div>
         </div>
         <nav class="nav">
-            <a href="dashboard.php">Dashboard</a>
-            <a href="addacc.php">Add Account</a>
-            <a href="userlist.php">Employee List</a>
-            <a href="create.php">Create Admin</a>
-            <a href="logs.php">Activity Logs</a>
+            <a href="dashboard.php" <?= ($current === 'dashboard.php') ? 'class="active"' : '' ?>>Dashboard</a>
+            <a href="addacc.php" <?= ($current === 'addacc.php') ? 'class="active"' : '' ?>>Add Account</a>
+            <a href="userlist.php" <?= ($current === 'userlist.php') ? 'class="active"' : '' ?>>Employee List</a>
+            <a href="create.php" <?= ($current === 'create.php') ? 'class="active"' : '' ?>>Create Admin</a>
+            <a href="logs.php" <?= ($current === 'logs.php') ? 'class="active"' : '' ?>>Activity Logs</a>
         </nav>
     </aside>
     <div class="content">
@@ -155,7 +157,7 @@ if (isset($_GET['edit']) && intval($_GET['edit'])>0) {
                             <th>Logs</th>
                             <th>Device</th>
                             <th>Date / Time</th>
-                            <th>Actions</th>
+                           
                         </tr>
                     </thead>
                     <tbody>
@@ -204,8 +206,8 @@ if (isset($_GET['edit']) && intval($_GET['edit'])>0) {
                             <td><?php echo htmlspecialchars($row['device']); ?></td>
                             <td><?php echo htmlspecialchars($row['created_at']); ?></td>
                             <td class="actions">
-                                <a class="btn-edit" href="logs.php?edit=<?php echo $row['id']; ?>">Edit</a>
-                                <a class="btn-delete" href="logs.php?action=delete&id=<?php echo $row['id']; ?>" onclick="return confirm('Delete this log?')">Delete</a>
+                             
+                                
                             </td>
                         </tr>
                         <?php endwhile; ?>

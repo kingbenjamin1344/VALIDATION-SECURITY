@@ -2,6 +2,7 @@
 session_start();
 $displayName = '';
 $role = $_SESSION['role'] ?? 'user';
+$current = basename($_SERVER['PHP_SELF']);
 if (!empty($_SESSION['role'])) {
     if ($_SESSION['role'] === 'superadmin') {
         $displayName = $_SESSION['superadmin'] ?? '';
@@ -84,7 +85,7 @@ function fmt_dt($dt) { if (!$dt) return '-'; return date('M d, Y h:i A', strtoti
         }
 
         .left-sidebar ul li {
-            padding: 15px 20px;
+            padding: 0;
         }
 
         .left-sidebar ul li a {
@@ -92,10 +93,18 @@ function fmt_dt($dt) { if (!$dt) return '-'; return date('M d, Y h:i A', strtoti
             text-decoration: none;
             font-size: 18px;
             display: block;
+            padding: 15px 20px;
+            box-sizing: border-box;
+            width: 100%;
         }
 
         .left-sidebar ul li a:hover {
             background-color: rgba(255,255,255,0.2);
+            border-radius: 5px;
+        }
+
+        .left-sidebar ul li a.active {
+            background-color: #063970; /* dark blue highlight */
             border-radius: 5px;
         }
 
@@ -349,11 +358,12 @@ function fmt_dt($dt) { if (!$dt) return '-'; return date('M d, Y h:i A', strtoti
             ?></div>
             <div class="role-label-small"><?=htmlspecialchars($role)?></div>
         </div>
-        <ul>
-                    <li><a href="../logform/indexes.php">Dashboard</a></li>
-            <li><a href="../logform/requestleave.php">Request Leave</a></li>
-            <li><a href="../logform/leave.php">Leave History</a></li>
-        </ul>
+            <ul>
+                <li><a href="../logform/indexes.php" <?= ($current === 'indexes.php') ? 'class="active"' : '' ?>>Dashboard</a></li>
+                <li><a href="../logform/requestleave.php" <?= ($current === 'requestleave.php') ? 'class="active"' : '' ?>>Request Leave</a></li>
+                <li><a href="../logform/leave.php" <?= ($current === 'leave.php') ? 'class="active"' : '' ?>>Leave History</a></li>
+            </ul>
+        
     </div>
 
     <!-- Top Navbar -->

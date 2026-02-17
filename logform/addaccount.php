@@ -34,7 +34,7 @@
         }
 
         .left-sidebar ul li {
-            padding: 15px 20px;
+            padding: 0;
         }
 
         .left-sidebar ul li a {
@@ -42,10 +42,18 @@
             text-decoration: none;
             font-size: 18px;
             display: block;
+            padding: 15px 20px;
+            box-sizing: border-box;
+            width: 100%;
         }
 
         .left-sidebar ul li a:hover {
             background-color: rgba(255,255,255,0.2);
+            border-radius: 5px;
+        }
+
+        .left-sidebar ul li a.active {
+            background-color: #063970; /* dark blue highlight */
             border-radius: 5px;
         }
 
@@ -272,9 +280,9 @@
     <!-- Left Sidebar -->
     <div class="left-sidebar">
         <ul>
-            <li><a href="../logform/indexes.php">Dashboard</a></li>
-            <li><a href="../logform/addaccount.php">Add Account</a></li>
-            <li><a href="../logform/employeelist.php">Employee List</a></li>
+            <li><a href="../logform/indexes.php" <?= (basename($_SERVER['PHP_SELF']) === 'indexes.php') ? 'class="active"' : '' ?>>Dashboard</a></li>
+            <li><a href="../logform/addaccount.php" <?= (basename($_SERVER['PHP_SELF']) === 'addaccount.php') ? 'class="active"' : '' ?>>Add Account</a></li>
+            <li><a href="../logform/employeelist.php" <?= (basename($_SERVER['PHP_SELF']) === 'employeelist.php') ? 'class="active"' : '' ?>>Employee List</a></li>
         </ul>
     </div>
 

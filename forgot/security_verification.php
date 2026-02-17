@@ -15,16 +15,26 @@ $modal_title = '';
 $modal_message = '';
 
 // Get user and security questions
-$userStmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
-$userStmt->bind_param('s', $email);
-$userStmt->execute();
-$userResult = $userStmt->get_result();
-$user = $userResult->fetch_assoc();
-$user_id = $user['id'];
 
-// Get security questions
-$secStmt = $conn->prepare("SELECT question_1, question_2, question_3 FROM security_questions WHERE user_id = ?");
-$secStmt->bind_param('i', $user_id);
+// Determine account type and id (user or admin)
+$account_type = $_SESSION['reset_account_type'] ?? 'user';
+$account_id = $_SESSION['reset_account_id'] ?? null;
+
+if ($account_type === 'admin') {
+    $secStmt = $conn->prepare("SELECT question_1, question_2, question_3 FROM security_questions WHERE account_type='admin' AND account_id = ?");
+    $secStmt->bind_param('i', $account_id);
+} else {
+    $userStmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
+    $userStmt->bind_param('s', $email);
+    $userStmt->execute();
+    $userResult = $userStmt->get_result();
+    $user = $userResult->fetch_assoc();
+    $user_id = $user['id'];
+
+    // Get security questions
+    $secStmt = $conn->prepare("SELECT question_1, question_2, question_3 FROM security_questions WHERE user_id = ?");
+    $secStmt->bind_param('i', $user_id);
+}
 $secStmt->execute();
 $secResult = $secStmt->get_result();
 $securityQuestions = $secResult->fetch_assoc();
@@ -46,9 +56,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $answer2 = trim($_POST['answer2'] ?? '');
     $answer3 = trim($_POST['answer3'] ?? '');
     
-    // Get stored answers
-    $ansStmt = $conn->prepare("SELECT answer_1, answer_2, answer_3 FROM security_questions WHERE user_id = ?");
-    $ansStmt->bind_param('i', $user_id);
+    // Get stored answers (support admin accounts)
+    if ($account_type === 'admin') {
+        $ansStmt = $conn->prepare("SELECT answer_1, answer_2, answer_3 FROM security_questions WHERE account_type='admin' AND account_id = ?");
+        $ansStmt->bind_param('i', $account_id);
+    } else {
+        $ansStmt = $conn->prepare("SELECT answer_1, answer_2, answer_3 FROM security_questions WHERE user_id = ?");
+        $ansStmt->bind_param('i', $user_id);
+    }
     $ansStmt->execute();
     $ansResult = $ansStmt->get_result();
     $answers = $ansResult->fetch_assoc();

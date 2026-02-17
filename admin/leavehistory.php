@@ -16,6 +16,7 @@ if ($displayName !== '') {
     $initials = strtoupper(substr($parts[0], 0, 1) . (isset($parts[1]) ? substr($parts[1], 0, 1) : ''));
 }
 $role = $_SESSION['role'] ?? 'user';
+$current = basename($_SERVER['PHP_SELF']);
 ?>
 <?php
 require_once __DIR__ . '/../regform/config.php';
@@ -89,7 +90,7 @@ if ($filter_user !== '') {
             display: block;
         }
         .left-sidebar ul li {
-            padding: 15px 20px;
+            padding: 0;
         }
 
         .left-sidebar ul li a {
@@ -97,10 +98,18 @@ if ($filter_user !== '') {
             text-decoration: none;
             font-size: 18px;
             display: block;
+            padding: 15px 20px;
+            box-sizing: border-box;
+            width: 100%;
         }
 
         .left-sidebar ul li a:hover {
             background-color: rgba(255,255,255,0.2);
+            border-radius: 5px;
+        }
+
+        .left-sidebar ul li a.active {
+            background-color: #063970; /* dark blue highlight */
             border-radius: 5px;
         }
 
@@ -353,10 +362,10 @@ if ($filter_user !== '') {
                  <div class="role-circle-small"><?=htmlspecialchars(strtoupper(substr($role,0,1)))?></div>
                  <div class="role-label-small"><?=htmlspecialchars($role)?></div>
               </div>
-              <li><a href="../admin/dashboard.php">Dashboard</a></li>
-              <li><a href="../admin/employeelist.php">Employee List</a></li>
-              <li><a href="../admin/leaverequest.php">Leave Request</a></li>
-              <li><a href="../admin/leavehistory.php">Leave History</a></li>
+              <li><a href="../admin/dashboard.php" <?= ($current === 'dashboard.php') ? 'class="active"' : '' ?>>Dashboard</a></li>
+              <li><a href="../admin/employeelist.php" <?= ($current === 'employeelist.php') ? 'class="active"' : '' ?>>Employee List</a></li>
+              <li><a href="../admin/leaverequest.php" <?= ($current === 'leaverequest.php') ? 'class="active"' : '' ?>>Leave Request</a></li>
+              <li><a href="../admin/leavehistory.php" <?= ($current === 'leavehistory.php') ? 'class="active"' : '' ?>>Leave History</a></li>
         </ul>
     </div>
 
@@ -368,6 +377,9 @@ if ($filter_user !== '') {
             <div class="profile-circle"><?=htmlspecialchars($initials)?></div>
             <div class="profile-name"><?=htmlspecialchars($displayName)?></div>
         </div>
+        <span class="settings-icon" onclick="toggleSidebar()" title="Settings">
+            <i class="fa-solid fa-gear"></i>
+        </span>
         <span class="logout-icon" onclick="logout()">
             <i class="fa-solid fa-right-from-bracket"></i>
         </span>
@@ -430,7 +442,14 @@ if ($filter_user !== '') {
     </main>
 
     <!-- Right Sidebar -->
-    
+    <div id="sidebar" class="sidebar" aria-hidden="true">
+        <div class="close-btn" onclick="toggleSidebar()">&times;</div>
+        <h3 style="color:#fff;margin-top:6px">Settings</h3>
+        <ul>
+            <li><a href="../security/security_question.php">Set Security Questions</a></li>
+            <li><a href="../admin/employeelist.php">Manage Employees</a></li>
+        </ul>
+    </div>
 
     <!-- Footer -->
     <div id="footer">

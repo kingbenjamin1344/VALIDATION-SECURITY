@@ -2,29 +2,48 @@
 session_start();
 require_once '../regform/config.php';
 
-if (!isset($_SESSION['username'])) {
+if (!isset($_SESSION['username']) && !isset($_SESSION['admin'])) {
     header('Location: ../logform/login.php');
     exit();
 }
 
-$username = $_SESSION['username'];
+ $username = $_SESSION['username'] ?? null;
 
-// Get user ID
-$userStmt = $conn->prepare("SELECT id FROM users WHERE username=?");
-$userStmt->bind_param('s', $username);
-$userStmt->execute();
-$userResult = $userStmt->get_result();
-$userRow = $userResult->fetch_assoc();
-$user_id = $userRow['id'];
+// Ensure security_questions table has admin support columns
+$colCheck = $conn->query("SHOW COLUMNS FROM security_questions LIKE 'account_type'");
+if ($colCheck && $colCheck->num_rows == 0) {
+    $conn->query("ALTER TABLE security_questions ADD COLUMN account_type VARCHAR(10) NOT NULL DEFAULT 'user', ADD COLUMN account_id INT NULL");
+}
+
+// Determine account type (user or admin) and id
+$account_type = 'user';
+$account_id = null;
+if (isset($_SESSION['admin'])) {
+    $account_type = 'admin';
+    $account_id = $_SESSION['admin']['id'];
+} elseif ($username) {
+    // Get user ID
+    $userStmt = $conn->prepare("SELECT id FROM users WHERE username=?");
+    $userStmt->bind_param('s', $username);
+    $userStmt->execute();
+    $userResult = $userStmt->get_result();
+    $userRow = $userResult->fetch_assoc();
+    $account_id = $userRow['id'] ?? null;
+}
 
 $message = '';
 $message_type = '';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['answers'])) {
     if (isset($_POST['edit'])) {
-        // Load current questions
-        $stmt = $conn->prepare("SELECT question_1, question_2, question_3 FROM security_questions WHERE user_id=?");
-        $stmt->bind_param('i', $user_id);
+        // Load current questions for this account
+        if ($account_type === 'admin') {
+            $stmt = $conn->prepare("SELECT question_1, question_2, question_3 FROM security_questions WHERE account_type='admin' AND account_id=?");
+            $stmt->bind_param('i', $account_id);
+        } else {
+            $stmt = $conn->prepare("SELECT question_1, question_2, question_3 FROM security_questions WHERE user_id=?");
+            $stmt->bind_param('i', $account_id);
+        }
         $stmt->execute();
         $result = $stmt->get_result();
         $questions = $result->fetch_assoc();
@@ -70,30 +89,55 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['answers'])) {
         $message = 'All fields are required.';
         $message_type = 'error';
     } else {
-        // Check if security questions already exist for user
-        $checkStmt = $conn->prepare("SELECT id FROM security_questions WHERE user_id=?");
-        $checkStmt->bind_param('i', $user_id);
+        // Check if security questions already exist for this account
+        if ($account_type === 'admin') {
+            $checkStmt = $conn->prepare("SELECT id FROM security_questions WHERE account_type='admin' AND account_id=?");
+            $checkStmt->bind_param('i', $account_id);
+        } else {
+            $checkStmt = $conn->prepare("SELECT id FROM security_questions WHERE user_id=?");
+            $checkStmt->bind_param('i', $account_id);
+        }
         $checkStmt->execute();
         $checkResult = $checkStmt->get_result();
         
         if ($checkResult->num_rows > 0) {
             // Update existing record
-            $stmt = $conn->prepare("UPDATE security_questions SET question_1=?, answer_1=?, question_2=?, answer_2=?, question_3=?, answer_3=? WHERE user_id=?");
-            $stmt->bind_param('ssssssi', 
-                $questions['q1'], $answer1, 
-                $questions['q2'], $answer2, 
-                $questions['q3'], $answer3, 
-                $user_id
-            );
+            if ($account_type === 'admin') {
+                $stmt = $conn->prepare("UPDATE security_questions SET question_1=?, answer_1=?, question_2=?, answer_2=?, question_3=?, answer_3=? WHERE account_type='admin' AND account_id=?");
+                $stmt->bind_param('ssssssi', 
+                    $questions['q1'], $answer1, 
+                    $questions['q2'], $answer2, 
+                    $questions['q3'], $answer3, 
+                    $account_id
+                );
+            } else {
+                $stmt = $conn->prepare("UPDATE security_questions SET question_1=?, answer_1=?, question_2=?, answer_2=?, question_3=?, answer_3=? WHERE user_id=?");
+                $stmt->bind_param('ssssssi', 
+                    $questions['q1'], $answer1, 
+                    $questions['q2'], $answer2, 
+                    $questions['q3'], $answer3, 
+                    $account_id
+                );
+            }
         } else {
             // Insert new record
-            $stmt = $conn->prepare("INSERT INTO security_questions (user_id, question_1, answer_1, question_2, answer_2, question_3, answer_3) VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param('issssss', 
-                $user_id,
-                $questions['q1'], $answer1, 
-                $questions['q2'], $answer2, 
-                $questions['q3'], $answer3
-            );
+            if ($account_type === 'admin') {
+                $stmt = $conn->prepare("INSERT INTO security_questions (account_type, account_id, question_1, answer_1, question_2, answer_2, question_3, answer_3) VALUES ('admin', ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->bind_param('issssss', 
+                    $account_id,
+                    $questions['q1'], $answer1, 
+                    $questions['q2'], $answer2, 
+                    $questions['q3'], $answer3
+                );
+            } else {
+                $stmt = $conn->prepare("INSERT INTO security_questions (user_id, question_1, answer_1, question_2, answer_2, question_3, answer_3) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $stmt->bind_param('issssss', 
+                    $account_id,
+                    $questions['q1'], $answer1, 
+                    $questions['q2'], $answer2, 
+                    $questions['q3'], $answer3
+                );
+            }
         }
         
         if ($stmt->execute()) {

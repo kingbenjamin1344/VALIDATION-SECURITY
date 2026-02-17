@@ -57,23 +57,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             } 
             // Check OTP match
             elseif ($otp === $reset['otp']) {
-                // OTP correct - check if user has security questions
-                $userStmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
-                $userStmt->bind_param('s', $email);
-                $userStmt->execute();
-                $userResult = $userStmt->get_result();
-                $user = $userResult->fetch_assoc();
-                
-                // Check if user has security questions
-                $secStmt = $conn->prepare("SELECT id FROM security_questions WHERE user_id = ?");
-                $secStmt->bind_param('i', $user['id']);
+                // OTP correct - determine account type (user/admin) and check security questions
+                $_SESSION['otp_verified'] = true;
+                $account_type = $_SESSION['reset_account_type'] ?? 'user';
+                $account_id = null;
+                if ($account_type === 'admin') {
+                    $account_id = $_SESSION['reset_account_id'] ?? null;
+                    $secStmt = $conn->prepare("SELECT id FROM security_questions WHERE account_type='admin' AND account_id = ?");
+                    $secStmt->bind_param('i', $account_id);
+                } else {
+                    $userStmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
+                    $userStmt->bind_param('s', $email);
+                    $userStmt->execute();
+                    $userResult = $userStmt->get_result();
+                    $user = $userResult->fetch_assoc();
+                    $account_id = $user['id'] ?? null;
+                    $secStmt = $conn->prepare("SELECT id FROM security_questions WHERE user_id = ?");
+                    $secStmt->bind_param('i', $account_id);
+                }
                 $secStmt->execute();
                 $secResult = $secStmt->get_result();
-                
-                $_SESSION['otp_verified'] = true;
-                
-                if ($secResult->num_rows > 0) {
-                    // User has security questions, go to security verification
+
+                if ($secResult && $secResult->num_rows > 0) {
+                    // Has security questions
                     header('Location: security_verification.php');
                 } else {
                     // No security questions, go directly to reset password

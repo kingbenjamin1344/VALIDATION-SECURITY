@@ -2,24 +2,40 @@
 session_start();
 require_once '../regform/config.php';
 
-if (!isset($_SESSION['username'])) {
+// allow both users and admins to manage their security questions
+if (!isset($_SESSION['username']) && !isset($_SESSION['admin'])) {
     header('Location: ../logform/login.php');
     exit();
 }
 
-$username = $_SESSION['username'];
+// Ensure columns exist
+$colCheck = $conn->query("SHOW COLUMNS FROM security_questions LIKE 'account_type'");
+if ($colCheck && $colCheck->num_rows == 0) {
+    $conn->query("ALTER TABLE security_questions ADD COLUMN account_type VARCHAR(10) NOT NULL DEFAULT 'user', ADD COLUMN account_id INT NULL");
+}
 
-// Get user ID
-$userStmt = $conn->prepare("SELECT id FROM users WHERE username=?");
-$userStmt->bind_param('s', $username);
-$userStmt->execute();
-$userResult = $userStmt->get_result();
-$userRow = $userResult->fetch_assoc();
-$user_id = $userRow['id'];
+$account_type = isset($_SESSION['admin']) ? 'admin' : 'user';
+$account_id = null;
+if ($account_type === 'admin') {
+    $account_id = $_SESSION['admin']['id'];
+} else {
+    $username = $_SESSION['username'];
+    $userStmt = $conn->prepare("SELECT id FROM users WHERE username=?");
+    $userStmt->bind_param('s', $username);
+    $userStmt->execute();
+    $userResult = $userStmt->get_result();
+    $userRow = $userResult->fetch_assoc();
+    $account_id = $userRow['id'] ?? null;
+}
 
 // Check if security questions already exist
-$stmt = $conn->prepare("SELECT question_1, question_2, question_3 FROM security_questions WHERE user_id=?");
-$stmt->bind_param('i', $user_id);
+if ($account_type === 'admin') {
+    $stmt = $conn->prepare("SELECT question_1, question_2, question_3 FROM security_questions WHERE account_type='admin' AND account_id=?");
+    $stmt->bind_param('i', $account_id);
+} else {
+    $stmt = $conn->prepare("SELECT question_1, question_2, question_3 FROM security_questions WHERE user_id=?");
+    $stmt->bind_param('i', $account_id);
+}
 $stmt->execute();
 $result = $stmt->get_result();
 $existingQuestions = $result->fetch_assoc();

@@ -30,9 +30,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $message = 'Passwords do not match.';
         $message_type = 'error';
     } else {
-        // Update password
+        // Update password (support admin accounts)
         $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-        $stmt = $conn->prepare("UPDATE users SET password = ? WHERE email = ?");
+        $account_type = $_SESSION['reset_account_type'] ?? 'user';
+        if ($account_type === 'admin') {
+            $stmt = $conn->prepare("UPDATE admins SET password = ? WHERE email = ?");
+        } else {
+            $stmt = $conn->prepare("UPDATE users SET password = ? WHERE email = ?");
+        }
         $stmt->bind_param('ss', $hashed_password, $email);
         
         if ($stmt->execute()) {
