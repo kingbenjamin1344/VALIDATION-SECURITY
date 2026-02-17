@@ -16,26 +16,11 @@ if ($displayName !== '') {
     $parts = preg_split('/\s+/', trim($displayName));
     $initials = strtoupper(substr($parts[0], 0, 1) . (isset($parts[1]) ? substr($parts[1], 0, 1) : ''));
 }
-// connect and fetch leave counts for logged-in user
+// connect
 require_once __DIR__ . '/../regform/config.php';
 
-$safe_user = mysqli_real_escape_string($conn, (string)($_SESSION['username'] ?? $_SESSION['user']['username'] ?? ''));
-$total_leaves = 0;
-$pending_leaves = 0;
-$approved_leaves = 0;
-$declined_leaves = 0;
-
-$r = @mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM requestleave WHERE username='". $safe_user ."'");
-if ($r) { $row = mysqli_fetch_assoc($r); $total_leaves = (int)($row['cnt'] ?? 0); }
-
-$r = @mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM requestleave WHERE username='". $safe_user ."' AND status='pending'");
-if ($r) { $row = mysqli_fetch_assoc($r); $pending_leaves = (int)($row['cnt'] ?? 0); }
-
-$r = @mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM requestleave WHERE username='". $safe_user ."' AND status='approved'");
-if ($r) { $row = mysqli_fetch_assoc($r); $approved_leaves = (int)($row['cnt'] ?? 0); }
-
-$r = @mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM requestleave WHERE username='". $safe_user ."' AND status='declined'");
-if ($r) { $row = mysqli_fetch_assoc($r); $declined_leaves = (int)($row['cnt'] ?? 0); }
+// helper to format datetime
+function fmt_dt($dt) { if (!$dt) return '-'; return date('M d, Y h:i A', strtotime($dt)); }
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -365,7 +350,7 @@ if ($r) { $row = mysqli_fetch_assoc($r); $declined_leaves = (int)($row['cnt'] ??
             <div class="role-label-small"><?=htmlspecialchars($role)?></div>
         </div>
         <ul>
-            <li><a href="../logform/indexes.php">Dashboard</a></li>
+                    <li><a href="../logform/indexes.php">Dashboard</a></li>
             <li><a href="../logform/requestleave.php">Request Leave</a></li>
             <li><a href="../logform/leave.php">Leave History</a></li>
         </ul>
@@ -390,7 +375,6 @@ if ($r) { $row = mysqli_fetch_assoc($r); $declined_leaves = (int)($row['cnt'] ??
                         $profile_full = implode(' ', $name_parts);
                     }
                 }
-                // initials: prefer precomputed $initials, otherwise derive from profile_full
                 $display_initials = '';
                 if (!empty($initials)) {
                     $display_initials = $initials;
@@ -401,7 +385,6 @@ if ($r) { $row = mysqli_fetch_assoc($r); $declined_leaves = (int)($row['cnt'] ??
             ?>
             <div class="profile-circle"><?=htmlspecialchars($display_initials)?></div>
             <?php
-                // show only firstname + lastname next to the circle when available
                 $profile_short = $displayName;
                 if (!empty($_SESSION['user'])) {
                     $u = $_SESSION['user'];
@@ -421,22 +404,51 @@ if ($r) { $row = mysqli_fetch_assoc($r); $declined_leaves = (int)($row['cnt'] ??
 
     <!-- Main Content -->
     <main>
-        <div class="cards">
-            <div class="card">
-                <h2><?=htmlspecialchars($total_leaves)?></h2>
-                <p>Total Requests</p>
-            </div>
-            <div class="card">
-                <h2><?=htmlspecialchars($pending_leaves)?></h2>
-                <p>Pending Leaves</p>
-            </div>
-            <div class="card">
-                <h2><?=htmlspecialchars($approved_leaves)?></h2>
-                <p>Approved Leaves</p>
-            </div>
-            <div class="card">
-                <h2><?=htmlspecialchars($declined_leaves)?></h2>
-                <p>Declined Requests</p>
+        <div style="display:flex;gap:20px;align-items:flex-start;">
+            <div style="flex:1;background:white;padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.06);">
+                <h3>Responded Leave Requests</h3>
+                <?php
+                    $safe_user = mysqli_real_escape_string($conn, (string)($_SESSION['username'] ?? $_SESSION['user']['username'] ?? ''));
+                    $sql = "SELECT r.id, r.leave_type, r.start_date, r.end_date, r.reason, r.status, r.created_at, r.updated_at, lr.admin_id, a.fullname AS admin_name, lr.action AS action_taken, lr.acted_at FROM requestleave r LEFT JOIN leaverequest lr ON lr.request_id = r.id LEFT JOIN admins a ON lr.admin_id = a.id WHERE r.username='". $safe_user ."' AND r.status IN ('approved','declined') ORDER BY COALESCE(lr.acted_at, r.updated_at, r.created_at) DESC";
+                    $res = mysqli_query($conn, $sql);
+                ?>
+
+                <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+                    <thead>
+                        <tr style="text-align:left;border-bottom:1px solid #eee;">
+                            <th style="padding:8px">Type</th>
+                            <th style="padding:8px">Start</th>
+                            <th style="padding:8px">End</th>
+                            <th style="padding:8px">Reason</th>
+                            <th style="padding:8px">Status</th>
+                            <th style="padding:8px">Responded By</th>
+                            <th style="padding:8px">Responded At</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if ($res && mysqli_num_rows($res) > 0): while($row = mysqli_fetch_assoc($res)): ?>
+                            <tr style="border-bottom:1px solid #f3f3f3;">
+                                <td style="padding:8px;vertical-align:top;"><?=htmlspecialchars($row['leave_type'])?></td>
+                                <td style="padding:8px;vertical-align:top;"><?=htmlspecialchars($row['start_date'])?></td>
+                                <td style="padding:8px;vertical-align:top;"><?=htmlspecialchars($row['end_date'])?></td>
+                                <td style="padding:8px;vertical-align:top;max-width:280px;word-wrap:break-word;"><?=nl2br(htmlspecialchars($row['reason']))?></td>
+                                <td style="padding:8px;vertical-align:top;">
+                                    <?php
+                                        $st = $row['status'] ?? 'pending';
+                                        $color = '#6c757d';
+                                        if ($st === 'approved') $color = '#28a745';
+                                        if ($st === 'declined') $color = '#dc3545';
+                                    ?>
+                                    <span style="color:<?=htmlspecialchars($color)?>;font-weight:600;"><?=htmlspecialchars(ucfirst($st))?></span>
+                                </td>
+                                <td style="padding:8px;vertical-align:top;"><?=htmlspecialchars($row['admin_name'] ?? '-')?></td>
+                                <td style="padding:8px;vertical-align:top;"><?=htmlspecialchars(fmt_dt($row['acted_at'] ?? $row['updated_at'] ?? $row['created_at']))?></td>
+                            </tr>
+                        <?php endwhile; else: ?>
+                            <tr><td colspan="7" style="padding:12px;color:#666;">No responded requests found.</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </main>

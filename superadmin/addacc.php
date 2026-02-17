@@ -86,10 +86,11 @@ if ($res) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Branches - Superadmin</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         :root{--blue:#1698ff;--nav-blue:#1f9bff;--bg:#f5f7fb;--card-bg:#fff}
         *{box-sizing:border-box}
-        body{font-family:Inter,Arial,Helvetica,sans-serif;margin:0;background:var(--bg);color:#243042}
+        body{font-family:Inter,Arial,Helvetica,sans-serif;margin:0;background:var(--bg);color:#243042;overflow-x:hidden;padding-bottom:64px}
         .app{display:flex;min-height:100vh}
         .sidebar{width:220px;background:var(--nav-blue);color:#fff;padding:28px 18px 18px}
         .role-area{ text-align:center; padding:8px 0 16px }
@@ -100,7 +101,8 @@ if ($res) {
         .nav a{color:#fff;text-decoration:none;padding:10px 12px;border-radius:6px;display:block}
         .nav a:hover{background:rgba(255,255,255,0.08)}
         .content{flex:1;display:flex;flex-direction:column}
-        .header{height:64px;background:var(--blue);color:#fff;display:flex;align-items:center;padding:0 24px;justify-content:center}
+        .header{height:64px;background:var(--blue);color:#fff;display:flex;align-items:center;padding:0 24px;justify-content:center;position:relative}
+        .logout-icon{position:absolute;right:24px;top:50%;transform:translateY(-50%);font-size:20px;cursor:pointer}
         .container{padding:24px 28px;flex:1}
         .panel{background:#fff;border-radius:8px;padding:18px;box-shadow:0 6px 18px rgba(15,23,42,0.06)}
         form.row{display:flex;gap:10px;align-items:center}
@@ -109,8 +111,14 @@ if ($res) {
         table{width:100%;border-collapse:collapse;margin-top:16px}
         th,td{padding:12px 10px;border-bottom:1px solid #eef2f7;text-align:left}
         th{background:#fafafa}
-        .actions a{margin-right:8px;color:var(--blue);text-decoration:none}
+        .actions a{margin-right:8px;text-decoration:none;display:inline-block;padding:6px 8px;border-radius:6px;font-size:13px}
+        .actions .btn-delete{background:#dc3545;color:#fff;border:1px solid rgba(0,0,0,0.06)}
+        .actions .btn-edit{background:linear-gradient(180deg,#ffbf4d,#ff9f1a);color:#000;border:1px solid rgba(0,0,0,0.06)}
+        .actions .btn-disable{background:#1f9bff;color:#fff;border:1px solid rgba(0,0,0,0.06)}
         .msg{margin:10px 0;color:#064e3b;background:#ecfdf5;padding:8px;border-radius:6px;border:1px solid #bbf7d0}
+        #footer{position:fixed;bottom:0;left:0;right:0;height:48px;background-color:#1E90FF;color:white;text-align:center;padding:0;z-index:1000;display:flex;align-items:center;justify-content:center}
+        .footer-wrap{box-sizing:border-box;padding:10px 0;padding-left:220px;max-width:calc(100% - 220px)}
+        @media (max-width:900px){.footer-wrap{padding-left:0;max-width:100%}}
     </style>
 </head>
 <body>
@@ -127,11 +135,14 @@ if ($res) {
             <a href="userlist.php">Employee List</a>
             <a href="create.php">Create Admin</a>
             <a href="logs.php">Activity Logs</a>
-            <a href="logout.php">Logout</a>
         </nav>
     </aside>
     <div class="content">
-        <header class="header"><div class="title">Leave Management</div></header>
+        <header class="header"><div class="title">Leave Management</div>
+            <span class="logout-icon" onclick="logout()">
+                <i class="fa-solid fa-right-from-bracket"></i>
+            </span>
+        </header>
         <div class="container">
             <div class="panel">
                 <?php if ($message): ?>
@@ -169,8 +180,8 @@ if ($res) {
                                     <td><?=htmlspecialchars($b['name'])?></td>
                                     <td><?=htmlspecialchars($b['created_at'])?></td>
                                     <td class="actions">
-                                        <a href="addacc.php?action=edit&id=<?=urlencode($b['id'])?>">Edit</a>
-                                        <a href="addacc.php?action=delete&id=<?=urlencode($b['id'])?>" onclick="return confirm('Delete this branch?')">Delete</a>
+                                        <a class="btn-edit" href="addacc.php?action=edit&id=<?=urlencode($b['id'])?>">Edit</a>
+                                        <a class="btn-delete" href="addacc.php?action=delete&id=<?=urlencode($b['id'])?>" onclick="return confirm('Delete this branch?')">Delete</a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -180,7 +191,30 @@ if ($res) {
             </div>
         </div>
     </div>
-</div>
+    </div>
+
+    <!-- Logout Modal -->
+    <div id="logoutModal" style="display:none;position:fixed;inset:0;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);z-index:2000">
+        <div style="background:#fff;padding:20px;border-radius:8px;width:320px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.2)">
+            <h3 style="margin:0;color:var(--blue)">Confirm Logout</h3>
+            <p style="color:#555">Are you sure you want to logout?</p>
+            <div style="display:flex;gap:10px">
+                <button style="flex:1;background:#dc3545;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer" onclick="closeLogoutModal()">Cancel</button>
+                <button style="flex:1;background:#28a745;color:#fff;border:none;padding:10px;border-radius:6px;cursor:pointer" onclick="confirmLogout()">Yes</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function logout(){ document.getElementById('logoutModal').style.display='flex'; }
+        function closeLogoutModal(){ document.getElementById('logoutModal').style.display='none'; }
+        function confirmLogout(){ window.location.href='logout.php'; }
+    </script>
+
+    <div id="footer">
+        <div class="footer-wrap"><p>@South Loan & Finance Company Inc. 2024</p></div>
+    </div>
+
 </body>
 </html>
 

@@ -1,7 +1,6 @@
 <?php
 session_start();
 $displayName = '';
-$role = $_SESSION['role'] ?? 'user';
 if (!empty($_SESSION['role'])) {
     if ($_SESSION['role'] === 'superadmin') {
         $displayName = $_SESSION['superadmin'] ?? '';
@@ -16,26 +15,31 @@ if ($displayName !== '') {
     $parts = preg_split('/\s+/', trim($displayName));
     $initials = strtoupper(substr($parts[0], 0, 1) . (isset($parts[1]) ? substr($parts[1], 0, 1) : ''));
 }
-// connect and fetch leave counts for logged-in user
+$role = $_SESSION['role'] ?? 'user';
+// DB and user list
+$message = '';
 require_once __DIR__ . '/../regform/config.php';
+if (!isset($conn) || !($conn instanceof mysqli)) {
+    $conn = mysqli_connect('localhost','root','','it107_security_sql');
+}
 
-$safe_user = mysqli_real_escape_string($conn, (string)($_SESSION['username'] ?? $_SESSION['user']['username'] ?? ''));
-$total_leaves = 0;
-$pending_leaves = 0;
-$approved_leaves = 0;
-$declined_leaves = 0;
+if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
+    $id = (int)$_GET['id'];
+    $stmt = $conn->prepare('DELETE FROM users WHERE id = ?');
+    if ($stmt) {
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+        $stmt->close();
+    }
+    header('Location: employeelist.php');
+    exit;
+}
 
-$r = @mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM requestleave WHERE username='". $safe_user ."'");
-if ($r) { $row = mysqli_fetch_assoc($r); $total_leaves = (int)($row['cnt'] ?? 0); }
-
-$r = @mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM requestleave WHERE username='". $safe_user ."' AND status='pending'");
-if ($r) { $row = mysqli_fetch_assoc($r); $pending_leaves = (int)($row['cnt'] ?? 0); }
-
-$r = @mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM requestleave WHERE username='". $safe_user ."' AND status='approved'");
-if ($r) { $row = mysqli_fetch_assoc($r); $approved_leaves = (int)($row['cnt'] ?? 0); }
-
-$r = @mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM requestleave WHERE username='". $safe_user ."' AND status='declined'");
-if ($r) { $row = mysqli_fetch_assoc($r); $declined_leaves = (int)($row['cnt'] ?? 0); }
+$users = [];
+$res = mysqli_query($conn, "SELECT id,id_no,firstname,middlename,lastname,suffix,username,email,birthdate,age,sex,purok,barangay,municipality,province,zipcode,country FROM users ORDER BY id DESC");
+if ($res) {
+    while ($row = mysqli_fetch_assoc($res)) { $users[] = $row; }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -97,7 +101,6 @@ if ($r) { $row = mysqli_fetch_assoc($r); $declined_leaves = (int)($row['cnt'] ??
             text-transform: capitalize;
             display: block;
         }
-
         .left-sidebar ul li {
             padding: 15px 20px;
         }
@@ -214,6 +217,18 @@ if ($r) { $row = mysqli_fetch_assoc($r); $declined_leaves = (int)($row['cnt'] ??
             font-size: 34px;
             color: #1E90FF;
         }
+        .panel{background:#fff;border-radius:8px;padding:18px;box-shadow:0 6px 18px rgba(15,23,42,0.06)}
+        table{width:100%;border-collapse:collapse;margin-top:8px}
+        th,td{padding:10px;border-bottom:1px solid #eef2f7;text-align:left}
+        th{background:#fafafa}
+        .actions a{margin-right:8px;color:#1E90FF;text-decoration:none}
+        .msg{margin:10px 0;color:#064e3b;background:#ecfdf5;padding:8px;border-radius:6px;border:1px solid #bbf7d0}
+        /* Address sidebar */
+        .address-sidebar{position:fixed;top:0;right:-420px;width:380px;height:100%;background:#fff;box-shadow:0 8px 30px rgba(2,6,23,0.2);transition:right .28s ease;z-index:1500;padding:20px;box-sizing:border-box}
+        .address-sidebar.open{right:0}
+        .address-sidebar h4{margin:0 0 12px;color:#1E90FF}
+        .address-row{margin:8px 0;color:#333}
+        .btn-address{background:#1E90FF;color:#fff;padding:6px 10px;border-radius:6px;border:none;cursor:pointer;text-decoration:none}
 
         .card p {
             margin: 5px 0 0;
@@ -358,61 +373,25 @@ if ($r) { $row = mysqli_fetch_assoc($r); $declined_leaves = (int)($row['cnt'] ??
 
     <!-- Left Sidebar -->
     <div class="left-sidebar">
-        <div class="role-area">
-            <div class="role-circle-small"><?=
-                htmlspecialchars(strtoupper(substr($role,0,1)))
-            ?></div>
-            <div class="role-label-small"><?=htmlspecialchars($role)?></div>
-        </div>
         <ul>
-            <li><a href="../logform/indexes.php">Dashboard</a></li>
-            <li><a href="../logform/requestleave.php">Request Leave</a></li>
-            <li><a href="../logform/leave.php">Leave History</a></li>
+              <div class="role-area">
+                 <div class="role-circle-small"><?=htmlspecialchars(strtoupper(substr($role,0,1)))?></div>
+                 <div class="role-label-small"><?=htmlspecialchars($role)?></div>
+              </div>
+   <li><a href="../admin/dashboard.php">Dashboard</a></li>
+              <li><a href="../admin/employeelist.php">Employee List</a></li>
+              <li><a href="../admin/leaverequest.php">Leave Request</a></li>
+              <li><a href="../admin/leavehistory.php">Leave History</a></li>
         </ul>
     </div>
 
     <!-- Top Navbar -->
     <div class="top-navbar">
-        <span class="settings-icon" onclick="toggleSidebar()">&#9881;</span>
+       
         <div class="navbar-title">Leave Management</div>
         <div class="profile" aria-label="profile">
-            <?php
-                $profile_full = $displayName;
-                if (!empty($_SESSION['user'])) {
-                    $u = $_SESSION['user'];
-                    $name_parts = array_filter([
-                        trim((string)($u['firstname'] ?? '')),
-                        trim((string)($u['middlename'] ?? '')),
-                        trim((string)($u['lastname'] ?? '')),
-                        trim((string)($u['suffix'] ?? '')),
-                    ]);
-                    if (count($name_parts) > 0) {
-                        $profile_full = implode(' ', $name_parts);
-                    }
-                }
-                // initials: prefer precomputed $initials, otherwise derive from profile_full
-                $display_initials = '';
-                if (!empty($initials)) {
-                    $display_initials = $initials;
-                } else {
-                    $parts = preg_split('/\s+/', trim($profile_full));
-                    $display_initials = strtoupper((isset($parts[0]) ? substr($parts[0],0,1) : '') . (isset($parts[1]) ? substr($parts[1],0,1) : ''));
-                }
-            ?>
-            <div class="profile-circle"><?=htmlspecialchars($display_initials)?></div>
-            <?php
-                // show only firstname + lastname next to the circle when available
-                $profile_short = $displayName;
-                if (!empty($_SESSION['user'])) {
-                    $u = $_SESSION['user'];
-                    $first = trim((string)($u['firstname'] ?? ''));
-                    $last = trim((string)($u['lastname'] ?? ''));
-                    if ($first !== '' || $last !== '') {
-                        $profile_short = trim($first . ' ' . $last);
-                    }
-                }
-            ?>
-            <div class="profile-name"><?=htmlspecialchars($profile_short)?></div>
+            <div class="profile-circle"><?=htmlspecialchars($initials)?></div>
+            <div class="profile-name"><?=htmlspecialchars($displayName)?></div>
         </div>
         <span class="logout-icon" onclick="logout()">
             <i class="fa-solid fa-right-from-bracket"></i>
@@ -421,38 +400,65 @@ if ($r) { $row = mysqli_fetch_assoc($r); $declined_leaves = (int)($row['cnt'] ??
 
     <!-- Main Content -->
     <main>
-        <div class="cards">
-            <div class="card">
-                <h2><?=htmlspecialchars($total_leaves)?></h2>
-                <p>Total Requests</p>
-            </div>
-            <div class="card">
-                <h2><?=htmlspecialchars($pending_leaves)?></h2>
-                <p>Pending Leaves</p>
-            </div>
-            <div class="card">
-                <h2><?=htmlspecialchars($approved_leaves)?></h2>
-                <p>Approved Leaves</p>
-            </div>
-            <div class="card">
-                <h2><?=htmlspecialchars($declined_leaves)?></h2>
-                <p>Declined Requests</p>
-            </div>
+        <div class="panel">
+            <h3>Employee List</h3>
+            <?php if ($message): ?><div class="msg"><?=htmlspecialchars($message)?></div><?php endif; ?>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID No</th>
+                        <th>Full Name</th>
+                        <th>Suffix</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Birthdate</th>
+                        <th>Sex</th>
+                        <th>Age</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($users)): ?>
+                        <tr><td colspan="9" style="color:#6b7280">No users found.</td></tr>
+                    <?php else: ?>
+                        <?php foreach ($users as $u): ?>
+                            <tr>
+                                <td><?=htmlspecialchars($u['id_no'])?></td>
+                                <td><?=htmlspecialchars(trim($u['firstname'].' '.$u['middlename'].' '.$u['lastname']))?></td>
+                                <td><?=htmlspecialchars($u['suffix'])?></td>
+                                <td><?=htmlspecialchars($u['username'])?></td>
+                                <td><?=htmlspecialchars($u['email'])?></td>
+                                <td><?=htmlspecialchars($u['birthdate'])?></td>
+                                <td><?=htmlspecialchars($u['sex'])?></td>
+                                <td><?=htmlspecialchars($u['age'])?></td>
+                                <td class="actions">
+                                    
+                                    <button
+                                        class="btn-address"
+                                        type="button"
+                                        onclick="showAddress(this)"
+                                        data-purok="<?=htmlspecialchars($u['purok'], ENT_QUOTES)?>"
+                                        data-barangay="<?=htmlspecialchars($u['barangay'], ENT_QUOTES)?>"
+                                        data-municipality="<?=htmlspecialchars($u['municipality'], ENT_QUOTES)?>"
+                                        data-province="<?=htmlspecialchars($u['province'], ENT_QUOTES)?>"
+                                        data-zipcode="<?=htmlspecialchars($u['zipcode'], ENT_QUOTES)?>"
+                                        data-country="<?=htmlspecialchars($u['country'], ENT_QUOTES)?>"
+                                    >Address Details</button>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
     </main>
 
     <!-- Right Sidebar -->
-    <div class="sidebar" id="sidebar">
-        <span class="close-btn" onclick="toggleSidebar()">&times;</span>
-        <ul>
-            
-            <li><a href="../security/security_question.php">Set Security</a></li>
-        </ul>
-    </div>
+    
 
     <!-- Footer -->
     <div id="footer">
-        <p></p>
+        <p>@South Loan & Finance Company Inc. 2024</p>
     </div>
 
     <!-- Logout Modal -->
@@ -482,6 +488,39 @@ if ($r) { $row = mysqli_fetch_assoc($r); $declined_leaves = (int)($row['cnt'] ??
 
         function confirmLogout() {
             window.location.href = "logout.php";
+        }
+    </script>
+
+    <!-- Address Sidebar -->
+    <div id="addressSidebar" class="address-sidebar" aria-hidden="true">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <h4>Address Details</h4>
+            <button onclick="closeAddress()" style="background:transparent;border:none;font-size:18px;cursor:pointer">&times;</button>
+        </div>
+        <div class="address-row"><strong>Purok:</strong> <span id="addr-purok"></span></div>
+        <div class="address-row"><strong>Barangay:</strong> <span id="addr-barangay"></span></div>
+        <div class="address-row"><strong>Municipality:</strong> <span id="addr-municipality"></span></div>
+        <div class="address-row"><strong>Province:</strong> <span id="addr-province"></span></div>
+        <div class="address-row"><strong>Zipcode:</strong> <span id="addr-zipcode"></span></div>
+        <div class="address-row"><strong>Country:</strong> <span id="addr-country"></span></div>
+    </div>
+
+    <script>
+        function showAddress(btn){
+            var sidebar = document.getElementById('addressSidebar');
+            document.getElementById('addr-purok').textContent = btn.dataset.purok || '';
+            document.getElementById('addr-barangay').textContent = btn.dataset.barangay || '';
+            document.getElementById('addr-municipality').textContent = btn.dataset.municipality || '';
+            document.getElementById('addr-province').textContent = btn.dataset.province || '';
+            document.getElementById('addr-zipcode').textContent = btn.dataset.zipcode || '';
+            document.getElementById('addr-country').textContent = btn.dataset.country || '';
+            sidebar.classList.add('open');
+            sidebar.setAttribute('aria-hidden', 'false');
+        }
+        function closeAddress(){
+            var sidebar = document.getElementById('addressSidebar');
+            sidebar.classList.remove('open');
+            sidebar.setAttribute('aria-hidden', 'true');
         }
     </script>
 

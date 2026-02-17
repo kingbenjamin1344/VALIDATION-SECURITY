@@ -16,6 +16,25 @@ if ($displayName !== '') {
     $initials = strtoupper(substr($parts[0], 0, 1) . (isset($parts[1]) ? substr($parts[1], 0, 1) : ''));
 }
 $role = $_SESSION['role'] ?? 'user';
+// connect and compute overall counts
+require_once __DIR__ . '/../regform/config.php';
+
+$total_users = 0;
+$overall_leaves = 0;
+$overall_approved = 0;
+$overall_declined = 0;
+
+$r = @mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM users");
+if ($r) { $row = mysqli_fetch_assoc($r); $total_users = (int)($row['cnt'] ?? 0); }
+
+$r = @mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM requestleave");
+if ($r) { $row = mysqli_fetch_assoc($r); $overall_leaves = (int)($row['cnt'] ?? 0); }
+
+$r = @mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM requestleave WHERE status='approved'");
+if ($r) { $row = mysqli_fetch_assoc($r); $overall_approved = (int)($row['cnt'] ?? 0); }
+
+$r = @mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM requestleave WHERE status='declined'");
+if ($r) { $row = mysqli_fetch_assoc($r); $overall_declined = (int)($row['cnt'] ?? 0); }
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -342,9 +361,10 @@ $role = $_SESSION['role'] ?? 'user';
                  <div class="role-circle-small"><?=htmlspecialchars(strtoupper(substr($role,0,1)))?></div>
                  <div class="role-label-small"><?=htmlspecialchars($role)?></div>
               </div>
-              <li><a href="../admin/dashboard.php">Dashboard</a></li>
-              <li><a href="../logform/requestleave.php">Request Leave</a></li>
-              <li><a href="">Leave History</a></li>
+   <li><a href="../admin/dashboard.php">Dashboard</a></li>
+              <li><a href="../admin/employeelist.php">Employee List</a></li>
+              <li><a href="../admin/leaverequest.php">Leave Request</a></li>
+              <li><a href="../admin/leavehistory.php">Leave History</a></li>
         </ul>
     </div>
 
@@ -365,19 +385,19 @@ $role = $_SESSION['role'] ?? 'user';
     <main>
         <div class="cards">
             <div class="card">
-                <h2>120</h2>
+                <h2><?=htmlspecialchars($total_users)?></h2>
                 <p>Total Employees</p>
             </div>
             <div class="card">
-                <h2>8</h2>
-                <p>Pending Leaves</p>
+                <h2><?=htmlspecialchars($overall_leaves)?></h2>
+                <p>Overall Leaves</p>
             </div>
             <div class="card">
-                <h2>15</h2>
+                <h2><?=htmlspecialchars($overall_approved)?></h2>
                 <p>Approved Leaves</p>
             </div>
             <div class="card">
-                <h2>3</h2>
+                <h2><?=htmlspecialchars($overall_declined)?></h2>
                 <p>Declined Requests</p>
             </div>
         </div>

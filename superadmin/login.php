@@ -21,7 +21,7 @@ exit;
     <title>Superadmin Login</title>
     <style>
         :root{--bg:#0b63d6;--card:#ffffff;--muted:#6c757d;--accent:#0056b3}
-        html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial,Helvetica,sans-serif;background:linear-gradient(180deg,var(--bg),#0a53b4);-webkit-font-smoothing:antialiased;overflow:hidden}
+        html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial,Helvetica,sans-serif;background:linear-gradient(180deg,var(--bg),#0a53b4);-webkit-font-smoothing:antialiased;overflow:hidden;overflow-x:hidden}
         .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:40px}
         .wrap{width:100%;max-width:420px;padding:28px;background:var(--card);border-radius:12px;box-shadow:0 10px 30px rgba(2,6,23,0.35);border:1px solid rgba(255,255,255,0.06);box-sizing:border-box;overflow:hidden}
         h2{margin:0 0 12px;font-size:20px;color:#0b3b71}
@@ -36,6 +36,9 @@ exit;
         .secondary:hover{background:#e8f2ff}
         .error{color:#b00020;margin-top:10px}
         .helper{margin-top:12px;font-size:13px;color:var(--muted)}
+        #footer{position:fixed;bottom:0;left:0;right:0;height:48px;background-color:#1E90FF;color:white;text-align:center;padding:0;z-index:1000;display:flex;align-items:center;justify-content:center}
+        .footer-wrap{box-sizing:border-box;padding:10px 0;padding-left:220px;max-width:calc(100% - 220px)}
+        @media (max-width:900px){.footer-wrap{padding-left:0;max-width:100%}}
     </style>
 </head>
 <body>
@@ -55,5 +58,8 @@ exit;
     </form>
     </div>
 </div>
+    <div id="footer">
+        <div class="footer-wrap"><p>@South Loan & Finance Company Inc. 2024</p></div>
+    </div>
 </body>
 </html>

@@ -1,7 +1,6 @@
 <?php
 session_start();
 $displayName = '';
-$role = $_SESSION['role'] ?? 'user';
 if (!empty($_SESSION['role'])) {
     if ($_SESSION['role'] === 'superadmin') {
         $displayName = $_SESSION['superadmin'] ?? '';
@@ -16,26 +15,18 @@ if ($displayName !== '') {
     $parts = preg_split('/\s+/', trim($displayName));
     $initials = strtoupper(substr($parts[0], 0, 1) . (isset($parts[1]) ? substr($parts[1], 0, 1) : ''));
 }
-// connect and fetch leave counts for logged-in user
+$role = $_SESSION['role'] ?? 'user';
+?>
+<?php
 require_once __DIR__ . '/../regform/config.php';
 
-$safe_user = mysqli_real_escape_string($conn, (string)($_SESSION['username'] ?? $_SESSION['user']['username'] ?? ''));
-$total_leaves = 0;
-$pending_leaves = 0;
-$approved_leaves = 0;
-$declined_leaves = 0;
-
-$r = @mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM requestleave WHERE username='". $safe_user ."'");
-if ($r) { $row = mysqli_fetch_assoc($r); $total_leaves = (int)($row['cnt'] ?? 0); }
-
-$r = @mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM requestleave WHERE username='". $safe_user ."' AND status='pending'");
-if ($r) { $row = mysqli_fetch_assoc($r); $pending_leaves = (int)($row['cnt'] ?? 0); }
-
-$r = @mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM requestleave WHERE username='". $safe_user ."' AND status='approved'");
-if ($r) { $row = mysqli_fetch_assoc($r); $approved_leaves = (int)($row['cnt'] ?? 0); }
-
-$r = @mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM requestleave WHERE username='". $safe_user ."' AND status='declined'");
-if ($r) { $row = mysqli_fetch_assoc($r); $declined_leaves = (int)($row['cnt'] ?? 0); }
+$filter_user = trim((string)($_GET['user'] ?? ''));
+if ($filter_user !== '') {
+    $safe_user = mysqli_real_escape_string($conn, $filter_user);
+    $res = mysqli_query($conn, "SELECT r.id, r.user_id, r.username, r.email, r.leave_type, r.start_date, r.end_date, r.reason, r.status, r.created_at, u.firstname, u.middlename, u.lastname, lr.admin_id, a.fullname AS admin_name, lr.action AS action_taken, lr.note, lr.acted_at FROM requestleave r LEFT JOIN users u ON r.user_id = u.id LEFT JOIN leaverequest lr ON lr.request_id = r.id LEFT JOIN admins a ON lr.admin_id = a.id WHERE r.status IN ('approved','declined') AND r.username='".$safe_user."' ORDER BY lr.acted_at DESC");
+} else {
+    $res = mysqli_query($conn, "SELECT r.id, r.user_id, r.username, r.email, r.leave_type, r.start_date, r.end_date, r.reason, r.status, r.created_at, u.firstname, u.middlename, u.lastname, lr.admin_id, a.fullname AS admin_name, lr.action AS action_taken, lr.note, lr.acted_at FROM requestleave r LEFT JOIN users u ON r.user_id = u.id LEFT JOIN leaverequest lr ON lr.request_id = r.id LEFT JOIN admins a ON lr.admin_id = a.id WHERE r.status IN ('approved','declined') ORDER BY lr.acted_at DESC");
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -97,7 +88,6 @@ if ($r) { $row = mysqli_fetch_assoc($r); $declined_leaves = (int)($row['cnt'] ??
             text-transform: capitalize;
             display: block;
         }
-
         .left-sidebar ul li {
             padding: 15px 20px;
         }
@@ -358,61 +348,25 @@ if ($r) { $row = mysqli_fetch_assoc($r); $declined_leaves = (int)($row['cnt'] ??
 
     <!-- Left Sidebar -->
     <div class="left-sidebar">
-        <div class="role-area">
-            <div class="role-circle-small"><?=
-                htmlspecialchars(strtoupper(substr($role,0,1)))
-            ?></div>
-            <div class="role-label-small"><?=htmlspecialchars($role)?></div>
-        </div>
         <ul>
-            <li><a href="../logform/indexes.php">Dashboard</a></li>
-            <li><a href="../logform/requestleave.php">Request Leave</a></li>
-            <li><a href="../logform/leave.php">Leave History</a></li>
+              <div class="role-area">
+                 <div class="role-circle-small"><?=htmlspecialchars(strtoupper(substr($role,0,1)))?></div>
+                 <div class="role-label-small"><?=htmlspecialchars($role)?></div>
+              </div>
+              <li><a href="../admin/dashboard.php">Dashboard</a></li>
+              <li><a href="../admin/employeelist.php">Employee List</a></li>
+              <li><a href="../admin/leaverequest.php">Leave Request</a></li>
+              <li><a href="../admin/leavehistory.php">Leave History</a></li>
         </ul>
     </div>
 
     <!-- Top Navbar -->
     <div class="top-navbar">
-        <span class="settings-icon" onclick="toggleSidebar()">&#9881;</span>
+       
         <div class="navbar-title">Leave Management</div>
         <div class="profile" aria-label="profile">
-            <?php
-                $profile_full = $displayName;
-                if (!empty($_SESSION['user'])) {
-                    $u = $_SESSION['user'];
-                    $name_parts = array_filter([
-                        trim((string)($u['firstname'] ?? '')),
-                        trim((string)($u['middlename'] ?? '')),
-                        trim((string)($u['lastname'] ?? '')),
-                        trim((string)($u['suffix'] ?? '')),
-                    ]);
-                    if (count($name_parts) > 0) {
-                        $profile_full = implode(' ', $name_parts);
-                    }
-                }
-                // initials: prefer precomputed $initials, otherwise derive from profile_full
-                $display_initials = '';
-                if (!empty($initials)) {
-                    $display_initials = $initials;
-                } else {
-                    $parts = preg_split('/\s+/', trim($profile_full));
-                    $display_initials = strtoupper((isset($parts[0]) ? substr($parts[0],0,1) : '') . (isset($parts[1]) ? substr($parts[1],0,1) : ''));
-                }
-            ?>
-            <div class="profile-circle"><?=htmlspecialchars($display_initials)?></div>
-            <?php
-                // show only firstname + lastname next to the circle when available
-                $profile_short = $displayName;
-                if (!empty($_SESSION['user'])) {
-                    $u = $_SESSION['user'];
-                    $first = trim((string)($u['firstname'] ?? ''));
-                    $last = trim((string)($u['lastname'] ?? ''));
-                    if ($first !== '' || $last !== '') {
-                        $profile_short = trim($first . ' ' . $last);
-                    }
-                }
-            ?>
-            <div class="profile-name"><?=htmlspecialchars($profile_short)?></div>
+            <div class="profile-circle"><?=htmlspecialchars($initials)?></div>
+            <div class="profile-name"><?=htmlspecialchars($displayName)?></div>
         </div>
         <span class="logout-icon" onclick="logout()">
             <i class="fa-solid fa-right-from-bracket"></i>
@@ -421,38 +375,66 @@ if ($r) { $row = mysqli_fetch_assoc($r); $declined_leaves = (int)($row['cnt'] ??
 
     <!-- Main Content -->
     <main>
-        <div class="cards">
-            <div class="card">
-                <h2><?=htmlspecialchars($total_leaves)?></h2>
-                <p>Total Requests</p>
+        <div style="background:white;padding:16px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.06);">
+            <h3>Leave History</h3>
+            <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;">
+                <form method="get" style="display:flex;gap:8px;align-items:center;">
+                    <label for="user">Username</label>
+                    <input id="user" name="user" value="<?=htmlspecialchars($_GET['user'] ?? '')?>" placeholder="username" style="padding:6px;border:1px solid #ddd;border-radius:6px;" />
+                    <button type="submit" style="background:#1E90FF;color:white;border:none;padding:6px 10px;border-radius:6px;">Filter</button>
+                    <a href="leavehistory.php" style="margin-left:8px;color:#666;text-decoration:none;">Reset</a>
+                </form>
             </div>
-            <div class="card">
-                <h2><?=htmlspecialchars($pending_leaves)?></h2>
-                <p>Pending Leaves</p>
-            </div>
-            <div class="card">
-                <h2><?=htmlspecialchars($approved_leaves)?></h2>
-                <p>Approved Leaves</p>
-            </div>
-            <div class="card">
-                <h2><?=htmlspecialchars($declined_leaves)?></h2>
-                <p>Declined Requests</p>
-            </div>
+
+            <table style="width:100%;border-collapse:collapse;margin-top:10px;">
+                <thead>
+                    <tr style="text-align:left;border-bottom:1px solid #eee;">
+                        <th style="padding:8px">First Name</th>
+                        <th style="padding:8px">Middle Initial</th>
+                        <th style="padding:8px">Last Name</th>
+                        <th style="padding:8px">Username</th>
+                        
+                        <th style="padding:8px">Type</th>
+                        <th style="padding:8px">Start</th>
+                        <th style="padding:8px">End</th>
+                        <th style="padding:8px">Reason</th>
+                        <th style="padding:8px">Status</th>
+                        <th style="padding:8px">Actioned By</th>
+                        
+                        <th style="padding:8px">Acted At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if ($res && mysqli_num_rows($res) > 0): while($r = mysqli_fetch_assoc($res)): ?>
+                        <tr style="border-bottom:1px solid #f3f3f3;vertical-align:top;">
+                            <td style="padding:8px"><?=htmlspecialchars($r['firstname'] ?? '')?></td>
+                            <td style="padding:8px"><?=htmlspecialchars($r['middlename'] ? strtoupper(mb_substr($r['middlename'],0,1)) . '.' : '')?></td>
+                            <td style="padding:8px"><?=htmlspecialchars($r['lastname'] ?? '')?></td>
+                            <td style="padding:8px"><?=htmlspecialchars($r['username'])?></td>
+
+                            <td style="padding:8px"><?=htmlspecialchars($r['leave_type'])?></td>
+                            <td style="padding:8px"><?=htmlspecialchars($r['start_date'])?></td>
+                            <td style="padding:8px"><?=htmlspecialchars($r['end_date'])?></td>
+                            <td style="padding:8px;max-width:240px;word-wrap:break-word;"><?=nl2br(htmlspecialchars($r['reason']))?></td>
+                            <td style="padding:8px"><?=htmlspecialchars(ucfirst($r['status']))?></td>
+                            <td style="padding:8px"><?=htmlspecialchars($r['admin_name'] ?? $r['admin_id'] ?? '')?></td>
+
+                            <td style="padding:8px"><?=htmlspecialchars($r['acted_at'] ?? '')?></td>
+                        </tr>
+                    <?php endwhile; else: ?>
+                        <tr><td colspan="13" style="padding:12px;color:#666;">No history found.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
     </main>
 
     <!-- Right Sidebar -->
-    <div class="sidebar" id="sidebar">
-        <span class="close-btn" onclick="toggleSidebar()">&times;</span>
-        <ul>
-            
-            <li><a href="../security/security_question.php">Set Security</a></li>
-        </ul>
-    </div>
+    
 
     <!-- Footer -->
     <div id="footer">
-        <p></p>
+        <p>@South Loan & Finance Company Inc. 2024</p>
     </div>
 
     <!-- Logout Modal -->

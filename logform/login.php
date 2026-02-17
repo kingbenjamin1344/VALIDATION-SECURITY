@@ -67,7 +67,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
         // Finally, check users table (regular users)
-        $stmt = $conn->prepare("SELECT id, password FROM users WHERE username = ? LIMIT 1");
+        // include name fields so we can store them in session for display
+        $stmt = $conn->prepare("SELECT id, password, firstname, middlename, lastname, suffix, email FROM users WHERE username = ? LIMIT 1");
         if ($stmt === false) {
             die('Error preparing statement: ' . $conn->error);
         }
@@ -82,7 +83,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $row = $result->fetch_assoc();
             if (password_verify($password, $row['password'])) {
                 $_SESSION['username'] = $username;
-                $_SESSION['user'] = ['id' => $row['id'], 'username' => $username];
+                $_SESSION['user'] = [
+                    'id' => $row['id'],
+                    'username' => $username,
+                    'firstname' => $row['firstname'] ?? '',
+                    'middlename' => $row['middlename'] ?? '',
+                    'lastname' => $row['lastname'] ?? '',
+                    'suffix' => $row['suffix'] ?? '',
+                    'email' => $row['email'] ?? '',
+                    'fullname' => trim((($row['firstname'] ?? '') . ' ' . ($row['middlename'] ?? '') . ' ' . ($row['lastname'] ?? ''))),
+                ];
                 $_SESSION['role'] = 'user';
                 resetLoginAttempts(true);
                 $device = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
