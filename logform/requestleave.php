@@ -72,6 +72,55 @@ try {
     $schemaSql = "CREATE TABLE IF NOT EXISTS leave_requests (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  username VARCHAR(100) NOT NULL,\n  leave_type VARCHAR(50) NOT NULL,\n  start_date DATE NOT NULL,\n  end_date DATE DEFAULT NULL,\n  reason TEXT,\n  status ENUM('pending','approved','declined') DEFAULT 'pending',\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
 }
 
+// Handle form submission for new leave request
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_leave'])) {
+    $leave_type = $_POST['leave_type'] ?? '';
+    $start_date = $_POST['start_date'] ?? null;
+    $end_date = $_POST['end_date'] ?? null;
+    $reason = $_POST['reason'] ?? null;
+
+    if ($leave_type && $start_date) {
+        $ist = $conn->prepare("INSERT INTO leave_requests (username, leave_type, start_date, end_date, reason, status) VALUES (?, ?, ?, ?, ?, 'pending')");
+        if ($ist) {
+            $ist->bind_param('sssss', $username, $leave_type, $start_date, $end_date, $reason);
+            $ist->execute();
+            $ist->close();
+            header('Location: requestleave.php');
+            exit();
+        }
+    }
+}
+
+// Handle cancel action (set status to cancelled)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_cancel'], $_POST['id'])) {
+    $id = intval($_POST['id']);
+    $cstmt = $conn->prepare("UPDATE leave_requests SET status = 'cancelled' WHERE id = ? AND username = ? AND status = 'pending'");
+    if ($cstmt) {
+        $cstmt->bind_param('is', $id, $username);
+        $cstmt->execute();
+        $cstmt->close();
+        header('Location: requestleave.php');
+        exit();
+    }
+}
+
+// Fetch user's requests for listing
+$userRequests = [];
+try {
+    $ur = $conn->prepare("SELECT id, leave_type, start_date, end_date, reason, status, created_at FROM leave_requests WHERE username = ? ORDER BY created_at DESC");
+    if ($ur) {
+        $ur->bind_param('s', $username);
+        $ur->execute();
+        $resu = $ur->get_result();
+        while ($row = $resu->fetch_assoc()) {
+            $userRequests[] = $row;
+        }
+        $ur->close();
+    }
+} catch (mysqli_sql_exception $e) {
+    // ignore
+}
+
 ?>
 
 <!DOCTYPE html>
@@ -298,8 +347,8 @@ try {
             <div class="role-label-small">User</div>
         </div>
         <ul>
-   <li><a href="../logform/indexes.php" class="active">Dashboard</a></li>
-            <li><a href="../logform/requestleave.php" >Request Leave</a></li>
+   <li><a href="../logform/indexes.php" >Dashboard</a></li>
+            <li><a href="../logform/requestleave.php" class="active" >Request Leave</a></li>
             <li><a href="../logform/history.php">Leave History</a></li>
         </ul>
     </div>
@@ -321,22 +370,84 @@ try {
 
     <!-- Main -->
     <main>
-        <div class="cards">
-            <div class="card">
-                <h2><?php echo (int)$totalRequests; ?></h2>
-                <p>Total Requests</p>
+        <div style="max-width:1100px;margin:0 auto;">
+            <h1>Request Leave</h1>
+
+            <div style="background:#fff;padding:16px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06);margin-bottom:18px;">
+                <form method="post">
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                        <div style="flex:1;min-width:200px;">
+                            <label>Leave Type</label><br>
+                            <select name="leave_type" required style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd;">
+                                <option value="">-- Select --</option>
+                                <option value="Vacation">Vacation</option>
+                                <option value="Emergency">Emergency</option>
+                                <option value="Sick Leave">Sick Leave</option>
+                            </select>
+                        </div>
+
+                        <div style="min-width:160px;">
+                            <label>Start Date</label><br>
+                            <input type="date" name="start_date" required style="padding:8px;border-radius:6px;border:1px solid #ddd;" />
+                        </div>
+
+                        <div style="min-width:160px;">
+                            <label>End Date</label><br>
+                            <input type="date" name="end_date" style="padding:8px;border-radius:6px;border:1px solid #ddd;" />
+                        </div>
+
+                        <div style="flex-basis:100%;">
+                            <label>Reason</label><br>
+                            <textarea name="reason" rows="3" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd;"></textarea>
+                        </div>
+                    </div>
+                    <div style="margin-top:12px;text-align:right;">
+                        <button type="submit" name="submit_leave" style="background:#1E90FF;color:#fff;border:none;padding:10px 16px;border-radius:6px;">Submit Request</button>
+                    </div>
+                </form>
             </div>
-            <div class="card">
-                <h2><?php echo (int)$pending; ?></h2>
-                <p>Pending Leaves</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$approved; ?></h2>
-                <p>Approved Leaves</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$declined; ?></h2>
-                <p>Declined Requests</p>
+
+            <h2>Your Requests</h2>
+            <div style="background:#fff;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06);">
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr style="text-align:left;border-bottom:1px solid #eee;">
+                            <th style="padding:8px">Type</th>
+                            <th style="padding:8px">Start</th>
+                            <th style="padding:8px">End</th>
+                            <th style="padding:8px">Reason</th>
+                            <th style="padding:8px">Submitted</th>
+                            <th style="padding:8px">Status</th>
+                            <th style="padding:8px">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($userRequests)): ?>
+                            <tr><td colspan="7" style="padding:12px">No requests found.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($userRequests as $r): ?>
+                                <tr style="border-bottom:1px solid #f1f1f1;">
+                                    <td style="padding:8px"><?php echo htmlspecialchars($r['leave_type']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($r['start_date']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($r['end_date']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($r['reason']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($r['created_at']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars(ucfirst($r['status'])); ?></td>
+                                    <td style="padding:8px">
+                                        <?php if ($r['status'] === 'pending'): ?>
+                                            <form method="post" style="display:inline">
+                                                <input type="hidden" name="id" value="<?php echo (int)$r['id']; ?>">
+                                                <button type="submit" name="action_cancel" style="background:#dc3545;color:#fff;border:none;padding:6px 10px;border-radius:4px;">Cancel</button>
+                                            </form>
+                                        <?php else: ?>
+                                            -
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </main>
@@ -375,7 +486,8 @@ try {
     }
 
     function confirmLogout() {
-        alert("Logout clicked (UI only)");
+        // Redirect to server logout which destroys the session and sends user to login.php
+        window.location.href = 'logout.php';
     }
 </script>
 

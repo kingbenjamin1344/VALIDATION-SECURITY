@@ -15,6 +15,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $username = $_POST["username"];
     $password = $_POST["password"];
 
+    // Embedded system account for upper management (no registration needed)
+    // Credentials: username = upper_management  password = Upper@123
+    if ($username === 'upper_management' && $password === 'Upper@123') {
+        $_SESSION["username"] = $username;
+        $_SESSION['role'] = 'upper_management';
+        resetLoginAttempts(true);
+        header('Location: ../upper_management/dashboard.php');
+        exit();
+    }
+
     // Check if cooldown is active
     if (isset($_SESSION['cooldown_start_time'])) {
         $remainingCooldown = $_SESSION['cooldown_start_time'] - time();
@@ -32,7 +42,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     // If cooldown is not active, check login attempts
     if (!isset($_SESSION['login_attempts']) || $_SESSION['login_attempts'] > 0) {
-        $stmt = $conn->prepare("SELECT id, password FROM users WHERE username=?");
+        $stmt = $conn->prepare("SELECT id, password, role FROM users WHERE username=?");
         if ($stmt === false) {
             die('Error preparing statement: ' . $conn->error);
         }
@@ -49,10 +59,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $row = $result->fetch_assoc();
             if (password_verify($password, $row["password"])) {
                 $_SESSION["username"] = $username;
+                $_SESSION['role'] = isset($row['role']) ? $row['role'] : 'user';
                 resetLoginAttempts(true);
 
-                // Redirect to a different page after successful login
-                header('Location: indexes.php');
+                // Redirect based on role
+                if ($_SESSION['role'] === 'upper_management') {
+                    header('Location: ../upper_management/dashboard.php');
+                } elseif ($_SESSION['role'] === 'superadmin') {
+                    header('Location: ../superadmin/dashboard.php');
+                } elseif ($_SESSION['role'] === 'admin') {
+                    header('Location: ../admin/dashboard.php');
+                } else {
+                    header('Location: ../logform/indexes.php');
+                }
                 exit();
             } else {
                 handleFailedLogin();

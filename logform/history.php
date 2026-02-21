@@ -72,6 +72,23 @@ try {
     $schemaSql = "CREATE TABLE IF NOT EXISTS leave_requests (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  username VARCHAR(100) NOT NULL,\n  leave_type VARCHAR(50) NOT NULL,\n  start_date DATE NOT NULL,\n  end_date DATE DEFAULT NULL,\n  reason TEXT,\n  status ENUM('pending','approved','declined') DEFAULT 'pending',\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
 }
 
+// Fetch user's approved/declined requests
+$historyRequests = [];
+try {
+    $hr = $conn->prepare("SELECT id, leave_type, start_date, end_date, reason, status, created_at FROM leave_requests WHERE username = ? AND status IN ('approved','declined') ORDER BY created_at DESC");
+    if ($hr) {
+        $hr->bind_param('s', $username);
+        $hr->execute();
+        $res = $hr->get_result();
+        while ($rw = $res->fetch_assoc()) {
+            $historyRequests[] = $rw;
+        }
+        $hr->close();
+    }
+} catch (mysqli_sql_exception $e) {
+    // ignore
+}
+
 ?>
 
 <!DOCTYPE html>
@@ -298,9 +315,9 @@ try {
             <div class="role-label-small">User</div>
         </div>
         <ul>
-   <li><a href="../logform/indexes.php" class="active">Dashboard</a></li>
+   <li><a href="../logform/indexes.php" >Dashboard</a></li>
             <li><a href="../logform/requestleave.php" >Request Leave</a></li>
-            <li><a href="../logform/history.php">Leave History</a></li>
+            <li><a href="../logform/history.php" class="active">Leave History</a></li>
         </ul>
     </div>
 
@@ -321,22 +338,37 @@ try {
 
     <!-- Main -->
     <main>
-        <div class="cards">
-            <div class="card">
-                <h2><?php echo (int)$totalRequests; ?></h2>
-                <p>Total Requests</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$pending; ?></h2>
-                <p>Pending Leaves</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$approved; ?></h2>
-                <p>Approved Leaves</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$declined; ?></h2>
-                <p>Declined Requests</p>
+        <div style="max-width:1100px;margin:0 auto;">
+            <h1>Leave History</h1>
+            <div style="background:#fff;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06);">
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr style="text-align:left;border-bottom:1px solid #eee;">
+                            <th style="padding:8px">Type</th>
+                            <th style="padding:8px">Start</th>
+                            <th style="padding:8px">End</th>
+                            <th style="padding:8px">Reason</th>
+                            <th style="padding:8px">Submitted</th>
+                            <th style="padding:8px">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($historyRequests)): ?>
+                            <tr><td colspan="6" style="padding:12px">No approved or declined requests.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($historyRequests as $r): ?>
+                                <tr style="border-bottom:1px solid #f1f1f1;">
+                                    <td style="padding:8px"><?php echo htmlspecialchars($r['leave_type']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($r['start_date']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($r['end_date']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($r['reason']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($r['created_at']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars(ucfirst($r['status'])); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </main>
@@ -375,7 +407,8 @@ try {
     }
 
     function confirmLogout() {
-        alert("Logout clicked (UI only)");
+        // Redirect to server logout which destroys the session and sends user to login.php
+        window.location.href = 'logout.php';
     }
 </script>
 

@@ -1,79 +1,61 @@
-
 <?php
 session_start();
-// Redirect users with roles away from the general `indexes.php`
-if (isset($_SESSION['username'])) {
-    $role = isset($_SESSION['role']) ? $_SESSION['role'] : null;
-    if ($role === 'upper_management') {
-        header('Location: ../upper_management/dashboard.php');
-        exit();
-    } elseif ($role === 'superadmin') {
-        header('Location: ../superadmin/dashboard.php');
-        exit();
-    } elseif ($role === 'admin') {
-        header('Location: ../admin/dashboard.php');
-        exit();
-    }
-}
-// require DB connection and fetch user info for UI
 require_once __DIR__ . '/../regform/config.php';
 
-// If not logged in, redirect to login
+// Access control: only upper_management can access
 if (!isset($_SESSION['username'])) {
-    header('Location: login.php');
+    header('Location: ../logform/login.php');
     exit();
 }
-
-$username = $_SESSION['username'];
-$firstname = '';
-$lastname = '';
-$initials = '';
-$totalRequests = $pending = $approved = $declined = 0;
-
-// Fetch user info
-$stmt = $conn->prepare("SELECT firstname, lastname FROM users WHERE username = ? LIMIT 1");
-if ($stmt) {
-    $stmt->bind_param('s', $username);
-    $stmt->execute();
-    $res = $stmt->get_result();
-    if ($res && $res->num_rows > 0) {
-        $row = $res->fetch_assoc();
-        $firstname = $row['firstname'];
-        $lastname = $row['lastname'];
-        $initials = strtoupper(substr($firstname,0,1) . substr($lastname,0,1));
+$role = isset($_SESSION['role']) ? $_SESSION['role'] : null;
+if ($role !== 'upper_management') {
+    // redirect according to actual role
+    if ($role === 'superadmin') header('Location: ../superadmin/dashboard.php');
+    elseif ($role === 'admin') header('Location: ../admin/dashboard.php');
+    else header('Location: ../logform/indexes.php');
+    exit();
+}
+// Fetch upper management user info for display
+$um_first = '';
+$um_last = '';
+$um_initials = '';
+if (isset($_SESSION['username'])) {
+    $uname = $_SESSION['username'];
+    $pst = $conn->prepare('SELECT firstname, lastname FROM users WHERE username = ? LIMIT 1');
+    if ($pst) {
+        $pst->bind_param('s', $uname);
+        $pst->execute();
+        $gres = $pst->get_result();
+        if ($gres && $gres->num_rows) {
+            $rw = $gres->fetch_assoc();
+            $um_first = $rw['firstname'] ?? '';
+            $um_last = $rw['lastname'] ?? '';
+            $um_initials = strtoupper(substr(($um_first ?: 'U'),0,1) . substr(($um_last ?: ' '),0,1));
+        }
+        $pst->close();
     }
-    $stmt->close();
 }
 
-// Fetch counts from leave_requests table (uses username column)
-$countStmt = null;
+// Fetch counts for roles
+$countSuper = 0; $countAdmin = 0; $countUser = 0;
 try {
-    $countStmt = $conn->prepare("SELECT
-        COUNT(*) as total,
-        SUM(status = 'pending') as pending,
-        SUM(status = 'approved') as approved,
-        SUM(status = 'declined') as declined
-        FROM leave_requests WHERE username = ?");
-    if ($countStmt) {
-        $countStmt->bind_param('s', $username);
-        $countStmt->execute();
-        $cr = $countStmt->get_result();
-        if ($cr && $cr->num_rows > 0) {
-            $c = $cr->fetch_assoc();
-            $totalRequests = $c['total'] ?? 0;
-            $pending = $c['pending'] ?? 0;
-            $approved = $c['approved'] ?? 0;
-            $declined = $c['declined'] ?? 0;
+    $r = $conn->query("SELECT role, COUNT(*) as cnt FROM users GROUP BY role");
+    if ($r) {
+        while ($row = $r->fetch_assoc()) {
+            $roleName = $row['role'];
+            $cnt = (int)$row['cnt'];
+            if ($roleName === 'superadmin') $countSuper = $cnt;
+            elseif ($roleName === 'admin') $countAdmin = $cnt;
+            elseif ($roleName === 'user') $countUser = $cnt;
         }
-        $countStmt->close();
     }
 } catch (mysqli_sql_exception $e) {
-    $countsError = 'leave_requests table not found or missing columns.';
-    $schemaSql = "CREATE TABLE IF NOT EXISTS leave_requests (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  username VARCHAR(100) NOT NULL,\n  leave_type VARCHAR(50) NOT NULL,\n  start_date DATE NOT NULL,\n  end_date DATE DEFAULT NULL,\n  reason TEXT,\n  status ENUM('pending','approved','declined') DEFAULT 'pending',\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
+    // ignore errors; counts remain 0
 }
 
+// Overall count
+$countOverall = $countSuper + $countAdmin + $countUser;
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -294,24 +276,25 @@ try {
     <!-- Left Sidebar -->
     <div class="left-sidebar">
         <div class="role-area">
-            <div class="role-circle-small">U</div>
-            <div class="role-label-small">User</div>
+            <div class="role-circle-small">UM</div>
+            <div class="role-label-small">Upper Management</div>
         </div>
         <ul>
-   <li><a href="../logform/indexes.php" class="active">Dashboard</a></li>
-            <li><a href="../logform/requestleave.php" >Request Leave</a></li>
-            <li><a href="../logform/history.php">Leave History</a></li>
+            <li><a href="../upper_management/dashboard.php" >Dashboard</a></li>
+            <li><a href="../upper_management/manage.php">Manage Roles</a></li>
+            <li><a href="../upper_management/userlist.php">Userlist</a></li>
+             <li><a href="../upper_management/activity.php" class="active">Activity Logs</a></li>
         </ul>
     </div>
 
     <!-- Top Navbar -->
     <div class="top-navbar">
-        <span class="settings-icon" onclick="toggleSidebar()">&#9881;</span>
+      
         <div class="navbar-title">Leave Management</div>
 
         <div class="profile">
-            <div class="profile-circle"><?php echo htmlspecialchars($initials ?: 'U'); ?></div>
-            <div class="profile-name"><?php echo htmlspecialchars(trim($firstname . ' ' . $lastname) ?: $_SESSION['username']); ?></div>
+            <div class="profile-circle"><?php echo htmlspecialchars($um_initials ?: 'UM'); ?></div>
+            <div class="profile-name"><?php echo htmlspecialchars(trim($um_first . ' ' . $um_last) ?: ($_SESSION['username'] ?? 'Upper Management')); ?></div>
         </div>
 
         <span class="logout-icon" onclick="logout()">
@@ -321,33 +304,11 @@ try {
 
     <!-- Main -->
     <main>
-        <div class="cards">
-            <div class="card">
-                <h2><?php echo (int)$totalRequests; ?></h2>
-                <p>Total Requests</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$pending; ?></h2>
-                <p>Pending Leaves</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$approved; ?></h2>
-                <p>Approved Leaves</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$declined; ?></h2>
-                <p>Declined Requests</p>
-            </div>
-        </div>
+       
+    
     </main>
 
-    <!-- Right Sidebar -->
-    <div class="sidebar" id="sidebar">
-        <span class="close-btn" onclick="toggleSidebar()">&times;</span>
-        <ul>
-            <li><a href="../security/input_security_question.php">Set Security</a></li>
-        </ul>
-    </div>
+  
 
     <!-- Logout Modal -->
     <div id="logoutModal" class="modal-overlay">
@@ -375,7 +336,8 @@ try {
     }
 
     function confirmLogout() {
-        alert("Logout clicked (UI only)");
+        // Redirect to server logout which destroys session and redirects to login.php
+        window.location.href = '../logform/logout.php';
     }
 </script>
 
