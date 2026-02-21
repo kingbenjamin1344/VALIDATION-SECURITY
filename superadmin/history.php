@@ -49,6 +49,18 @@ try {
 } catch (mysqli_sql_exception $e) {
     // ignore - keep defaults
 }
+
+// Fetch all leave requests (include responded_at and responded_by if present)
+$colRes = $conn->query("SHOW COLUMNS FROM leave_requests LIKE 'responded_at'");
+$colRes2 = $conn->query("SHOW COLUMNS FROM leave_requests LIKE 'responded_by'");
+if ($colRes && $colRes->num_rows > 0 && $colRes2 && $colRes2->num_rows > 0) {
+    // include responder name via LEFT JOIN to users table when responded_by exists
+    $hist = $conn->query("SELECT lr.id, lr.username, lr.leave_type, lr.start_date, lr.end_date, lr.reason, lr.status, lr.created_at, lr.responded_at, lr.responded_by, r.firstname AS responder_firstname, r.middlename AS responder_middlename, r.lastname AS responder_lastname, r.role AS responder_role FROM leave_requests lr LEFT JOIN users r ON lr.responded_by = r.username ORDER BY lr.created_at DESC");
+} elseif ($colRes && $colRes->num_rows > 0) {
+    $hist = $conn->query("SELECT id, username, leave_type, start_date, end_date, reason, status, created_at, responded_at, NULL as responded_by, NULL as responder_firstname, NULL as responder_middlename, NULL as responder_lastname FROM leave_requests ORDER BY created_at DESC");
+} else {
+    $hist = $conn->query("SELECT id, username, leave_type, start_date, end_date, reason, status, created_at, NULL as responded_at, NULL as responded_by, NULL as responder_firstname, NULL as responder_middlename, NULL as responder_lastname FROM leave_requests ORDER BY created_at DESC");
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -274,10 +286,10 @@ try {
             <div class="role-label-small">Super Admin</div>
         </div>
         <ul>
-            <li><a href="../superadmin/dashboard.php"class="active" >Dashboard</a></li>
+                 <li><a href="../superadmin/dashboard.php" >Dashboard</a></li>
             <li><a href="../superadmin/user.php" >Block User</a></li>
             <li><a href="../superadmin/manage.php">Manage User List</a></li>
-            <li><a href="../superadmin/history.php">Leave History</a></li>
+            <li><a href="../superadmin/history.php" class="active">Leave History</a></li>
             <li><a href="../superadmin/activitylog.php">Activity Logs</a></li>
         </ul>
     </div>
@@ -299,22 +311,57 @@ try {
 
     <!-- Main -->
     <main>
-        <div class="cards">
-            <div class="card">
-                <h2><?php echo (int)$totalAll; ?></h2>
-                <p>Total Users (All)</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$countAdmin; ?></h2>
-                <p>Total Admin</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$countUser; ?></h2>
-                <p>Total Users</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$totalLeaves; ?></h2>
-                <p>Total Leave Requests</p>
+        <div style="max-width:1100px;margin:0 auto;padding:6px;">
+            <h1>All Leave Requests</h1>
+
+            <div style="background:#fff;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06);">
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr style="text-align:left;border-bottom:1px solid #eee;">
+                            <th style="padding:8px">Username</th>
+                            <th style="padding:8px">Leave Type</th>
+                            <th style="padding:8px">Start Date</th>
+                            <th style="padding:8px">End Date</th>
+                            <th style="padding:8px">Reason</th>
+                            <th style="padding:8px">Status</th>
+                            <th style="padding:8px">Requested At</th>
+                            <th style="padding:8px">Responded At</th>
+                            
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (!$hist || mysqli_num_rows($hist) === 0): ?>
+                            <tr><td colspan="8" style="padding:12px">No requests found.</td></tr>
+                        <?php else: ?>
+                            <?php while ($r = mysqli_fetch_assoc($hist)): ?>
+                                <tr style="border-bottom:1px solid #f1f1f1;">
+                                    <td style="padding:8px"><?php echo htmlspecialchars($r['username']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($r['leave_type']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($r['start_date']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($r['end_date']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($r['reason']); ?></td>
+                                    <td style="padding:8px;text-transform:capitalize"><?php echo htmlspecialchars($r['status']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($r['created_at']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($r['responded_at'] ?? ''); ?></td>
+                                    <td style="padding:8px">
+                                        <?php
+                                            if (!empty($r['responder_firstname']) || !empty($r['responder_lastname'])) {
+                                                $name = trim(($r['responder_firstname'] ?? '') . ' ' . ($r['responder_middlename'] ?? '') . ' ' . ($r['responder_lastname'] ?? ''));
+                                                $display = trim(preg_replace('/\s+/', ' ', $name));
+                                                if (!empty($r['responder_role'])) $display .= ' (' . $r['responder_role'] . ')';
+                                                echo htmlspecialchars($display);
+                                            } else {
+                                                $fallback = $r['responded_by'] ?? '';
+                                                if (!empty($r['responder_role'])) $fallback .= ' (' . $r['responder_role'] . ')';
+                                                echo htmlspecialchars($fallback);
+                                            }
+                                        ?>
+                                    </td>
+                                </tr>
+                            <?php endwhile; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </main>

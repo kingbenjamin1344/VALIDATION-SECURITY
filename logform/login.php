@@ -8,6 +8,12 @@ require_once '../regform/config.php'; // Assuming you have the database configur
 // Set your desired countdown durations
 $countdown_durations = [15, 30, 60]; // Durations for each failed attempt set
 
+// Ensure users table has is_blocked column (best-effort)
+$colCheck = $conn->query("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'is_blocked'");
+if (!$colCheck || $colCheck->num_rows === 0) {
+    @mysqli_query($conn, "ALTER TABLE users ADD COLUMN is_blocked TINYINT(1) DEFAULT 0");
+}
+
 
 
 // Check if the login form has been submitted
@@ -42,7 +48,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     // If cooldown is not active, check login attempts
     if (!isset($_SESSION['login_attempts']) || $_SESSION['login_attempts'] > 0) {
-        $stmt = $conn->prepare("SELECT id, password, role FROM users WHERE username=?");
+        $stmt = $conn->prepare("SELECT id, password, role, IFNULL(is_blocked,0) AS is_blocked FROM users WHERE username=?");
         if ($stmt === false) {
             die('Error preparing statement: ' . $conn->error);
         }
@@ -57,10 +63,35 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         if ($result->num_rows > 0) {
             $row = $result->fetch_assoc();
+            // If account is blocked by superadmin, show blocked modal and prevent login
+            if (!empty($row['is_blocked'])) {
+                $_SESSION['blocked_modal'] = 'Your account has been blocked by Superadmin.';
+                header('Location: login.php');
+                exit();
+            }
             if (password_verify($password, $row["password"])) {
                 $_SESSION["username"] = $username;
                 $_SESSION['role'] = isset($row['role']) ? $row['role'] : 'user';
                 resetLoginAttempts(true);
+
+                // Ensure activity_log table exists and record login
+                @mysqli_query($conn, "CREATE TABLE IF NOT EXISTS activity_log (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    username VARCHAR(100) NOT NULL,
+                    action VARCHAR(20) NOT NULL,
+                    device_name TEXT,
+                    ip VARCHAR(45),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+                $device = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
+                $ip = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '';
+                $ins = $conn->prepare("INSERT INTO activity_log (username, action, device_name, ip, created_at) VALUES (?, 'login', ?, ?, NOW())");
+                if ($ins) {
+                    $ins->bind_param('sss', $username, $device, $ip);
+                    $ins->execute();
+                    $ins->close();
+                }
 
                 // Redirect based on role
                 if ($_SESSION['role'] === 'upper_management') {
@@ -180,6 +211,18 @@ echo '<script>
                         <?php echo $_SESSION['error_message']; ?>
                         <?php unset($_SESSION['error_message']); ?>
                     </div>
+                <?php endif; ?>
+
+                <!-- Blocked account modal -->
+                <?php if (isset($_SESSION['blocked_modal'])): ?>
+                    <div id="blockedModal" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);z-index:2000;">
+                        <div style="background:#fff;padding:20px;border-radius:8px;max-width:420px;text-align:center;">
+                            <h3>Account Blocked</h3>
+                            <p><?php echo htmlspecialchars($_SESSION['blocked_modal']); ?></p>
+                            <button onclick="document.getElementById('blockedModal').style.display='none';" style="background:#007bff;color:#fff;padding:8px 12px;border:none;border-radius:6px;">Close</button>
+                        </div>
+                    </div>
+                    <?php unset($_SESSION['blocked_modal']); ?>
                 <?php endif; ?>
 
                 <form name="myform" method="post" autocomplete="off" id="loginForm" onsubmit="return validateForm()">

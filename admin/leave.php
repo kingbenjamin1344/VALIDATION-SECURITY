@@ -63,15 +63,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['id'
     if (in_array($action, ['approve','decline'])) {
         $newStatus = $action === 'approve' ? 'approved' : 'declined';
 
-        // ensure responded_at column exists
+        // ensure responded_at and responded_by columns exist
         $colRes = $conn->query("SHOW COLUMNS FROM leave_requests LIKE 'responded_at'");
         if ($colRes && $colRes->num_rows === 0) {
-            $conn->query("ALTER TABLE leave_requests ADD COLUMN responded_at DATETIME NULL");
+            @$conn->query("ALTER TABLE leave_requests ADD COLUMN responded_at DATETIME NULL");
+        }
+        $colRes2 = $conn->query("SHOW COLUMNS FROM leave_requests LIKE 'responded_by'");
+        if ($colRes2 && $colRes2->num_rows === 0) {
+            @$conn->query("ALTER TABLE leave_requests ADD COLUMN responded_by VARCHAR(100) DEFAULT NULL");
         }
 
-        $up = $conn->prepare("UPDATE leave_requests SET status = ?, responded_at = NOW() WHERE id = ?");
+        $adminUser = isset($_SESSION['username']) ? $_SESSION['username'] : 'admin';
+        $up = $conn->prepare("UPDATE leave_requests SET status = ?, responded_at = NOW(), responded_by = ? WHERE id = ?");
         if ($up) {
-            $up->bind_param('si', $newStatus, $id);
+            $up->bind_param('ssi', $newStatus, $adminUser, $id);
             $up->execute();
             $up->close();
         }

@@ -49,6 +49,30 @@ try {
 } catch (mysqli_sql_exception $e) {
     // ignore - keep defaults
 }
+// Ensure users table has is_blocked column
+$colCheck = $conn->query("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'is_blocked'");
+if (!$colCheck || $colCheck->num_rows === 0) {
+    // best-effort: attempt to add column, ignore failure
+    @$conn->query("ALTER TABLE users ADD COLUMN is_blocked TINYINT(1) DEFAULT 0");
+}
+
+// Handle block/unblock user (from superadmin page)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['block_user'])) {
+    $uid = (int)$_POST['block_user'];
+    $cur = $conn->query("SELECT is_blocked FROM users WHERE id=". $uid);
+    $curVal = 0;
+    if ($cur && $cur->num_rows) {
+        $r = $cur->fetch_assoc();
+        $curVal = (int)($r['is_blocked'] ?? 0);
+    }
+    $newVal = $curVal ? 0 : 1;
+    $conn->query("UPDATE users SET is_blocked=". $newVal ." WHERE id=". $uid);
+    header('Location: user.php');
+    exit;
+}
+
+// Fetch users (only admin and user)
+$users = mysqli_query($conn, "SELECT id, firstname, lastname, email, username, role, IFNULL(is_blocked,0) AS is_blocked FROM users WHERE role IN ('admin','user') ORDER BY id DESC");
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -274,8 +298,8 @@ try {
             <div class="role-label-small">Super Admin</div>
         </div>
         <ul>
-            <li><a href="../superadmin/dashboard.php"class="active" >Dashboard</a></li>
-            <li><a href="../superadmin/user.php" >Block User</a></li>
+            <li><a href="../superadmin/dashboard.php" >Dashboard</a></li>
+            <li><a href="../superadmin/user.php" class="active">Block User</a></li>
             <li><a href="../superadmin/manage.php">Manage User List</a></li>
             <li><a href="../superadmin/history.php">Leave History</a></li>
             <li><a href="../superadmin/activitylog.php">Activity Logs</a></li>
@@ -299,25 +323,55 @@ try {
 
     <!-- Main -->
     <main>
-        <div class="cards">
-            <div class="card">
-                <h2><?php echo (int)$totalAll; ?></h2>
-                <p>Total Users (All)</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$countAdmin; ?></h2>
-                <p>Total Admin</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$countUser; ?></h2>
-                <p>Total Users</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$totalLeaves; ?></h2>
-                <p>Total Leave Requests</p>
+        <div style="max-width:1100px;margin:0 auto;padding:6px;">
+            <h1>User List</h1>
+            <?php if (isset($_GET['deleted'])): ?>
+                <div style="background:#fff0f0;border:1px solid #f5c2c2;padding:10px;border-radius:6px;color:#7a1f1f;margin-bottom:12px;">User deleted.</div>
+            <?php endif; ?>
+
+            <div style="background:#fff;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06);">
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr style="text-align:left;border-bottom:1px solid #eee;">
+                            <th style="padding:8px">First Name</th>
+                            <th style="padding:8px">Last Name</th>
+                            <th style="padding:8px">Email</th>
+                            <th style="padding:8px">Username</th>
+                            <th style="padding:8px">Role</th>
+                            <th style="padding:8px">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (!$users || mysqli_num_rows($users) === 0): ?>
+                            <tr><td colspan="6" style="padding:12px">No users found.</td></tr>
+                        <?php else: ?>
+                            <?php while ($row = mysqli_fetch_assoc($users)): ?>
+                                <tr style="border-bottom:1px solid #f1f1f1;">
+                                    <td style="padding:8px"><?php echo htmlspecialchars($row['firstname']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($row['lastname']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($row['email']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($row['username']); ?></td>
+                                    <td style="padding:8px;text-transform:capitalize"><?php echo htmlspecialchars($row['role']); ?></td>
+                                    <td style="padding:8px">
+                                        <form method="post" style="display:inline">
+                                            <input type="hidden" name="block_user" value="<?php echo (int)$row['id']; ?>">
+                                            <?php if (!empty($row['is_blocked'])): ?>
+                                                <button type="submit" style="background:#28a745;color:#fff;border:none;padding:6px 8px;border-radius:4px;">Unblock</button>
+                                            <?php else: ?>
+                                                <button type="submit" style="background:#ff8800;color:#fff;border:none;padding:6px 8px;border-radius:4px;">Block</button>
+                                            <?php endif; ?>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <?php endwhile; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </main>
+
+    <!-- (Delete removed) -->
 
     <!-- Right Sidebar -->
     <div class="sidebar" id="sidebar">
@@ -356,6 +410,8 @@ try {
         // Redirect to server logout which destroys session and redirects to login
         window.location.href = '../logform/logout.php';
     }
+
+    // Block/unblock handled via inline forms
 </script>
 
 </body>

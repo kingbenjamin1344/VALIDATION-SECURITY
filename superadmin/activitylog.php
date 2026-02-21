@@ -274,11 +274,11 @@ try {
             <div class="role-label-small">Super Admin</div>
         </div>
         <ul>
-            <li><a href="../superadmin/dashboard.php"class="active" >Dashboard</a></li>
+                     <li><a href="../superadmin/dashboard.php" >Dashboard</a></li>
             <li><a href="../superadmin/user.php" >Block User</a></li>
             <li><a href="../superadmin/manage.php">Manage User List</a></li>
             <li><a href="../superadmin/history.php">Leave History</a></li>
-            <li><a href="../superadmin/activitylog.php">Activity Logs</a></li>
+            <li><a href="../superadmin/activitylog.php" class="active">Activity Logs</a></li>
         </ul>
     </div>
 
@@ -299,24 +299,69 @@ try {
 
     <!-- Main -->
     <main>
-        <div class="cards">
-            <div class="card">
-                <h2><?php echo (int)$totalAll; ?></h2>
-                <p>Total Users (All)</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$countAdmin; ?></h2>
-                <p>Total Admin</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$countUser; ?></h2>
-                <p>Total Users</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$totalLeaves; ?></h2>
-                <p>Total Leave Requests</p>
+        <?php
+        // Ensure activity_log table exists
+        @mysqli_query($conn, "CREATE TABLE IF NOT EXISTS activity_log (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            username VARCHAR(100) NOT NULL,
+            action VARCHAR(20) NOT NULL,
+            device_name TEXT,
+            ip VARCHAR(45),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        // Fetch recent activity for users with role admin or user
+        $logs = [];
+        $sql = "SELECT al.username, al.action, al.device_name, al.ip, al.created_at,
+                       u.firstname, u.middlename, u.lastname, u.suffix, u.role
+                FROM activity_log al
+                LEFT JOIN users u ON al.username = u.username
+                WHERE u.role IN ('admin','user')
+                ORDER BY al.created_at DESC";
+        $res = $conn->query($sql);
+        if ($res) {
+            while ($row = $res->fetch_assoc()) {
+                $logs[] = $row;
+            }
+        }
+        ?>
+
+        <div class="card">
+            <h2>Activity Logs</h2>
+            <div style="overflow:auto">
+            <table style="width:100%;border-collapse:collapse;margin-top:10px;">
+                <thead>
+                    <tr style="text-align:left;border-bottom:2px solid #eee;">
+                        <th style="padding:8px">Full Name</th>
+                        <th style="padding:8px">Action</th>
+                        <th style="padding:8px">Device</th>
+                        <th style="padding:8px">Date & Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if (count($logs) === 0): ?>
+                    <tr><td colspan="4" style="padding:12px;text-align:center;color:#666">No activity logs found.</td></tr>
+                <?php else: ?>
+                    <?php foreach ($logs as $l):
+                        $fname = trim(($l['firstname'] ?? '') . ' ' . ($l['middlename'] ?? '') . ' ' . ($l['lastname'] ?? '') . ' ' . ($l['suffix'] ?? ''));
+                        $displayName = $fname !== '' ? preg_replace('/\s+/', ' ', $fname) : ($l['username'] ?? '');
+                        $action = htmlspecialchars($l['action'] ?? '');
+                        $device = htmlspecialchars($l['device_name'] ?? '');
+                        $dt = htmlspecialchars($l['created_at'] ?? '');
+                    ?>
+                        <tr style="border-bottom:1px solid #f0f0f0;">
+                            <td style="padding:8px"><?php echo htmlspecialchars($displayName); ?><?php echo isset($l['role']) ? ' (' . htmlspecialchars($l['role']) . ')' : ''; ?></td>
+                            <td style="padding:8px;text-transform:capitalize"><?php echo $action; ?></td>
+                            <td style="padding:8px;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?php echo $device; ?></td>
+                            <td style="padding:8px"><?php echo $dt; ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                </tbody>
+            </table>
             </div>
         </div>
+
     </main>
 
     <!-- Right Sidebar -->

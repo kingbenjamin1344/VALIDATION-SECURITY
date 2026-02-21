@@ -49,6 +49,44 @@ try {
 } catch (mysqli_sql_exception $e) {
     // ignore - keep defaults
 }
+
+// Handle role update (allow superadmin to change roles to admin/user)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_id']) && isset($_POST['role'])) {
+    $uid = (int)$_POST['user_id'];
+    $newrole = mysqli_real_escape_string($conn, $_POST['role']);
+
+    mysqli_query($conn, "UPDATE users SET role='". $newrole ."' WHERE id=". $uid);
+
+    // remove from role-specific tables
+    mysqli_query($conn, "DELETE FROM upper_management WHERE user_id=". $uid);
+    mysqli_query($conn, "DELETE FROM superadmin WHERE user_id=". $uid);
+    mysqli_query($conn, "DELETE FROM admin WHERE user_id=". $uid);
+
+    if ($newrole === 'upper_management') {
+        mysqli_query($conn, "INSERT INTO upper_management (user_id) VALUES (". $uid .")");
+    } elseif ($newrole === 'superadmin') {
+        mysqli_query($conn, "INSERT INTO superadmin (user_id) VALUES (". $uid .")");
+    } elseif ($newrole === 'admin') {
+        mysqli_query($conn, "INSERT INTO admin (user_id) VALUES (". $uid .")");
+    }
+
+    header('Location: manage.php?updated=1');
+    exit;
+}
+
+// Handle delete user
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user'])) {
+    $delId = (int)$_POST['delete_user'];
+    mysqli_query($conn, "DELETE FROM upper_management WHERE user_id=". $delId);
+    mysqli_query($conn, "DELETE FROM superadmin WHERE user_id=". $delId);
+    mysqli_query($conn, "DELETE FROM admin WHERE user_id=". $delId);
+    mysqli_query($conn, "DELETE FROM users WHERE id=". $delId);
+    header('Location: manage.php?deleted=1');
+    exit;
+}
+
+// Fetch only admin and user rows for listing
+$users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix, age, birthdate, email, username, role, IFNULL(is_blocked,0) AS is_blocked, purok, barangay, municipality, country, zipcode FROM users WHERE role IN ('admin','user') ORDER BY id DESC");
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -262,6 +300,9 @@ try {
 
         .btn-confirm { background:#28a745; color:white; border:none; padding:10px; flex:1; }
         .btn-cancel  { background:#dc3545; color:white; border:none; padding:10px; flex:1; }
+        .status-dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:8px; vertical-align:middle; }
+        .status-active { background:#28a745; }
+        .status-deactive { background:#dc3545; }
     </style>
 </head>
 
@@ -274,9 +315,9 @@ try {
             <div class="role-label-small">Super Admin</div>
         </div>
         <ul>
-            <li><a href="../superadmin/dashboard.php"class="active" >Dashboard</a></li>
+              <li><a href="../superadmin/dashboard.php" >Dashboard</a></li>
             <li><a href="../superadmin/user.php" >Block User</a></li>
-            <li><a href="../superadmin/manage.php">Manage User List</a></li>
+            <li><a href="../superadmin/manage.php" class="active">Manage User List</a></li>
             <li><a href="../superadmin/history.php">Leave History</a></li>
             <li><a href="../superadmin/activitylog.php">Activity Logs</a></li>
         </ul>
@@ -297,27 +338,98 @@ try {
         </span>
     </div>
 
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal-overlay">
+        <div class="modal-box">
+            <h3>Confirm Delete</h3>
+            <p>Are you sure you want to delete this user? This action cannot be undone.</p>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+                <button class="btn-confirm" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <form id="deleteForm" method="post" style="display:none">
+        <input type="hidden" name="delete_user" id="deleteUserId" value="">
+    </form>
+
     <!-- Main -->
     <main>
-        <div class="cards">
-            <div class="card">
-                <h2><?php echo (int)$totalAll; ?></h2>
-                <p>Total Users (All)</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$countAdmin; ?></h2>
-                <p>Total Admin</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$countUser; ?></h2>
-                <p>Total Users</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$totalLeaves; ?></h2>
-                <p>Total Leave Requests</p>
+        <div style="max-width:1100px;margin:0 auto;padding:6px;">
+            <h1>Manage User List</h1>
+            <?php if (isset($_GET['deleted'])): ?>
+                <div style="background:#fff0f0;border:1px solid #f5c2c2;padding:10px;border-radius:6px;color:#7a1f1f;margin-bottom:12px;">User deleted.</div>
+            <?php endif; ?>
+
+            <div style="background:#fff;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06);">
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr style="text-align:left;border-bottom:1px solid #eee;">
+                            <th style="padding:8px">First</th>
+                            <th style="padding:8px">Middle</th>
+                            <th style="padding:8px">Last</th>
+                            <th style="padding:8px">Suffix</th>
+                            <th style="padding:8px">Age</th>
+                            <th style="padding:8px">Birthdate</th>
+                            <th style="padding:8px">Email</th>
+                            <th style="padding:8px">Status</th>
+                            <th style="padding:8px">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (!$users || mysqli_num_rows($users) === 0): ?>
+                            <tr><td colspan="8" style="padding:12px">No users found.</td></tr>
+                        <?php else: ?>
+                            <?php while ($row = mysqli_fetch_assoc($users)): ?>
+                                <tr style="border-bottom:1px solid #f1f1f1;">
+                                    <td style="padding:8px"><?php echo htmlspecialchars($row['firstname']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($row['middlename']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($row['lastname']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($row['suffix']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($row['age']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($row['birthdate']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($row['email']); ?></td>
+                                    <td style="padding:8px">
+                                        <?php if (empty($row['is_blocked'])): ?>
+                                            <span class="status-dot status-active"></span> Active
+                                        <?php else: ?>
+                                            <span class="status-dot status-deactive"></span> Deactive
+                                        <?php endif; ?>
+                                    </td>
+                                    <td style="padding:8px">
+                                        <button class="btn-view" 
+                                            data-purok="<?php echo htmlspecialchars($row['purok']); ?>" 
+                                            data-barangay="<?php echo htmlspecialchars($row['barangay']); ?>" 
+                                            data-municipality="<?php echo htmlspecialchars($row['municipality']); ?>" 
+                                            data-country="<?php echo htmlspecialchars($row['country']); ?>" 
+                                            data-zipcode="<?php echo htmlspecialchars($row['zipcode']); ?>"
+                                            onclick="openAddressSidebar(this)"
+                                            style="background:#0d6efd;color:#fff;border:none;padding:6px 8px;border-radius:4px;margin-right:6px;">View Address</button>
+
+                                        <button type="button" data-user-id="<?php echo (int)$row['id']; ?>" onclick="openDeleteModal(this)" style="background:#dc3545;color:#fff;border:none;padding:6px 8px;border-radius:4px;">Delete</button>
+                                    </td>
+                                </tr>
+                            <?php endwhile; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </main>
+
+    <!-- Address Sidebar -->
+    <div class="sidebar" id="addressSidebar">
+        <span class="close-btn" onclick="closeAddressSidebar()">&times;</span>
+        <h3>Address</h3>
+        <div style="margin-top:12px;">
+            <p><strong>Purok:</strong> <span id="addrPurok"></span></p>
+            <p><strong>Barangay:</strong> <span id="addrBarangay"></span></p>
+            <p><strong>Municipality:</strong> <span id="addrMunicipality"></span></p>
+            <p><strong>Country:</strong> <span id="addrCountry"></span></p>
+            <p><strong>Zipcode:</strong> <span id="addrZipcode"></span></p>
+        </div>
+    </div>
 
     <!-- Right Sidebar -->
     <div class="sidebar" id="sidebar">
@@ -355,6 +467,30 @@ try {
     function confirmLogout() {
         // Redirect to server logout which destroys session and redirects to login
         window.location.href = '../logform/logout.php';
+    }
+
+    function openAddressSidebar(btn) {
+        document.getElementById('addrPurok').textContent = btn.getAttribute('data-purok') || '';
+        document.getElementById('addrBarangay').textContent = btn.getAttribute('data-barangay') || '';
+        document.getElementById('addrMunicipality').textContent = btn.getAttribute('data-municipality') || '';
+        document.getElementById('addrCountry').textContent = btn.getAttribute('data-country') || '';
+        document.getElementById('addrZipcode').textContent = btn.getAttribute('data-zipcode') || '';
+        document.getElementById('addressSidebar').classList.add('open');
+    }
+
+    function closeAddressSidebar() {
+        document.getElementById('addressSidebar').classList.remove('open');
+    }
+
+    function openDeleteModal(btn) {
+        var id = btn.getAttribute('data-user-id');
+        document.getElementById('deleteUserId').value = id;
+        document.getElementById('deleteModal').style.display = 'flex';
+        document.getElementById('confirmDeleteBtn').onclick = function() { document.getElementById('deleteForm').submit(); };
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').style.display = 'none';
     }
 </script>
 

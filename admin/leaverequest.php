@@ -11,9 +11,20 @@ if (!isset($_SESSION['username']) || ($_SESSION['role'] ?? '') !== 'admin') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id'], $_POST['action'])) {
     $id = intval($_POST['id']);
     $action = $_POST['action'] === 'approve' ? 'approved' : 'declined';
-    $ustmt = $conn->prepare("UPDATE leave_requests SET status = ? WHERE id = ?");
+    // Ensure responded_at and responded_by columns exist (best-effort)
+    $col1 = $conn->query("SHOW COLUMNS FROM leave_requests LIKE 'responded_at'");
+    if (!$col1 || $col1->num_rows === 0) {
+        @$conn->query("ALTER TABLE leave_requests ADD COLUMN responded_at DATETIME NULL");
+    }
+    $col2 = $conn->query("SHOW COLUMNS FROM leave_requests LIKE 'responded_by'");
+    if (!$col2 || $col2->num_rows === 0) {
+        @$conn->query("ALTER TABLE leave_requests ADD COLUMN responded_by VARCHAR(100) DEFAULT NULL");
+    }
+
+    $adminUser = isset($_SESSION['username']) ? $_SESSION['username'] : 'admin';
+    $ustmt = $conn->prepare("UPDATE leave_requests SET status = ?, responded_at = NOW(), responded_by = ? WHERE id = ?");
     if ($ustmt) {
-        $ustmt->bind_param('si', $action, $id);
+        $ustmt->bind_param('ssi', $action, $adminUser, $id);
         $ustmt->execute();
         $ustmt->close();
     }
