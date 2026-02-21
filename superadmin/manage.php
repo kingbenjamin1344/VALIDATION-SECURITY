@@ -51,6 +51,9 @@ try {
 }
 
 // Handle role update (allow superadmin to change roles to admin/user)
+$showRoleModal = false;
+$modalFullName = '';
+$modalNewRole = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_id']) && isset($_POST['role'])) {
     $uid = (int)$_POST['user_id'];
     $newrole = mysqli_real_escape_string($conn, $_POST['role']);
@@ -70,8 +73,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_id']) && isset($
         mysqli_query($conn, "INSERT INTO admin (user_id) VALUES (". $uid .")");
     }
 
-    header('Location: manage.php?updated=1');
-    exit;
+    // Fetch the user's full name for modal display
+    $uRes = mysqli_query($conn, "SELECT firstname, middlename, lastname, suffix FROM users WHERE id=". $uid ." LIMIT 1");
+    if ($uRes && mysqli_num_rows($uRes) > 0) {
+        $u = mysqli_fetch_assoc($uRes);
+        $parts = array_filter([trim($u['firstname'] ?? ''), trim($u['middlename'] ?? ''), trim($u['lastname'] ?? ''), trim($u['suffix'] ?? '')]);
+        $modalFullName = implode(' ', $parts);
+    }
+    $modalNewRole = $newrole;
+    $showRoleModal = true;
+
+    // don't redirect; show a confirmation modal instead
 }
 
 // Handle delete user
@@ -85,8 +97,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user'])) {
     exit;
 }
 
-// Fetch only admin and user rows for listing
-$users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix, age, birthdate, email, username, role, IFNULL(is_blocked,0) AS is_blocked, purok, barangay, municipality, country, zipcode FROM users WHERE role IN ('admin','user') ORDER BY id DESC");
+// Fetch admin, user and superadmin rows for listing
+$users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix, age, birthdate, email, username, role, IFNULL(is_blocked,0) AS is_blocked, purok, barangay, municipality, country, zipcode FROM users WHERE role IN ('admin','user','superadmin') ORDER BY id DESC");
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -315,9 +327,10 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
             <div class="role-label-small">Super Admin</div>
         </div>
         <ul>
-              <li><a href="../superadmin/dashboard.php" >Dashboard</a></li>
+                         <li><a href="../superadmin/dashboard.php" >Dashboard</a></li>
             <li><a href="../superadmin/user.php" >Block User</a></li>
-            <li><a href="../superadmin/manage.php" class="active">Manage User List</a></li>
+            <li><a href="../superadmin/role.php" >Manage Role</a></li>
+            <li><a href="../superadmin/manage.php"class="active">Manage User List</a></li>
             <li><a href="../superadmin/history.php">Leave History</a></li>
             <li><a href="../superadmin/activitylog.php">Activity Logs</a></li>
         </ul>
@@ -451,6 +464,17 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
         </div>
     </div>
 
+    <!-- Role Set Confirmation Modal -->
+    <div id="roleSetModal" class="modal-overlay">
+        <div class="modal-box" style="max-width:420px;">
+            <h3>Role Updated</h3>
+            <p id="roleSetMessage" style="margin:12px 0;color:#333"></p>
+            <div class="modal-actions">
+                <button class="btn-confirm" onclick="closeRoleModal()">OK</button>
+            </div>
+        </div>
+    </div>
+
 <script>
     function toggleSidebar() {
         document.getElementById('sidebar').classList.toggle('open');
@@ -492,7 +516,20 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
     function closeDeleteModal() {
         document.getElementById('deleteModal').style.display = 'none';
     }
-</script>
 
+    function closeRoleModal() {
+        document.getElementById('roleSetModal').style.display = 'none';
+        // optional: reload to refresh table data after confirming
+        window.location.href = window.location.pathname;
+    }
+</script>
+</script>
+<?php if (!empty($showRoleModal)): ?>
+<script>
+    // populate and show the modal
+    document.getElementById('roleSetMessage').textContent = 'Set role <?php echo htmlspecialchars($modalFullName ?: 'User'); ?> to <?php echo htmlspecialchars($modalNewRole); ?>';
+    document.getElementById('roleSetModal').style.display = 'flex';
+</script>
+<?php endif; ?>
 </body>
 </html>

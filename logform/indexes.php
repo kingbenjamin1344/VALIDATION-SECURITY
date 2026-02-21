@@ -374,8 +374,9 @@ try {
         document.getElementById('logoutModal').style.display = "none";
     }
 
-    function confirmLogout() {
-        alert("Logout clicked (UI only)");
+      function confirmLogout() {
+        // Redirect to server logout which destroys the session and sends user to login.php
+        window.location.href = 'logout.php';
     }
 </script>
 

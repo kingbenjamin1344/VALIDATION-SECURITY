@@ -276,6 +276,7 @@ try {
         <ul>
             <li><a href="../superadmin/dashboard.php"class="active" >Dashboard</a></li>
             <li><a href="../superadmin/user.php" >Block User</a></li>
+            <li><a href="../superadmin/role.php" >Manage Role</a></li>
             <li><a href="../superadmin/manage.php">Manage User List</a></li>
             <li><a href="../superadmin/history.php">Leave History</a></li>
             <li><a href="../superadmin/activitylog.php">Activity Logs</a></li>

@@ -297,7 +297,6 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
             <li><a href="../upper_management/dashboard.php" >Dashboard</a></li>
             <li><a href="../upper_management/manage.php">Manage Roles</a></li>
             <li><a href="../upper_management/userlist.php" class="active">Userlist</a></li>
-             <li><a href="../upper_management/activity.php">Activity Logs</a></li>
         </ul>
     </div>
     <!-- Delete Confirmation Modal -->

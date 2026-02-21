@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../regform/config.php'; // Assuming you have the database configuration here
+require_once __DIR__ . '/../regform/activity_helper.php';
 
 
 
@@ -27,6 +28,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $_SESSION["username"] = $username;
         $_SESSION['role'] = 'upper_management';
         resetLoginAttempts(true);
+        // Record login for the embedded upper_management account
+        record_activity($conn, $username, 'login');
         header('Location: ../upper_management/dashboard.php');
         exit();
     }
@@ -74,24 +77,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $_SESSION['role'] = isset($row['role']) ? $row['role'] : 'user';
                 resetLoginAttempts(true);
 
-                // Ensure activity_log table exists and record login
-                @mysqli_query($conn, "CREATE TABLE IF NOT EXISTS activity_log (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    username VARCHAR(100) NOT NULL,
-                    action VARCHAR(20) NOT NULL,
-                    device_name TEXT,
-                    ip VARCHAR(45),
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-
-                $device = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
-                $ip = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '';
-                $ins = $conn->prepare("INSERT INTO activity_log (username, action, device_name, ip, created_at) VALUES (?, 'login', ?, ?, NOW())");
-                if ($ins) {
-                    $ins->bind_param('sss', $username, $device, $ip);
-                    $ins->execute();
-                    $ins->close();
-                }
+                // Record login activity
+                record_activity($conn, $username, 'login');
 
                 // Redirect based on role
                 if ($_SESSION['role'] === 'upper_management') {

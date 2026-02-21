@@ -15,6 +15,7 @@ if ($role !== 'upper_management') {
     else header('Location: ../logform/indexes.php');
     exit();
 }
+
 // Fetch upper management user info for display
 $um_first = '';
 $um_last = '';
@@ -312,7 +313,7 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
             <li><a href="../upper_management/dashboard.php" >Dashboard</a></li>
             <li><a href="../upper_management/manage.php" class="active">Manage Roles</a></li>
             <li><a href="../upper_management/userlist.php">Userlist</a></li>
-             <li><a href="../upper_management/activity.php">Activity Logs</a></li>
+
         </ul>
     </div>
 

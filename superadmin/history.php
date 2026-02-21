@@ -286,10 +286,11 @@ if ($colRes && $colRes->num_rows > 0 && $colRes2 && $colRes2->num_rows > 0) {
             <div class="role-label-small">Super Admin</div>
         </div>
         <ul>
-                 <li><a href="../superadmin/dashboard.php" >Dashboard</a></li>
+                           <li><a href="../superadmin/dashboard.php" >Dashboard</a></li>
             <li><a href="../superadmin/user.php" >Block User</a></li>
+            <li><a href="../superadmin/role.php" >Manage Role</a></li>
             <li><a href="../superadmin/manage.php">Manage User List</a></li>
-            <li><a href="../superadmin/history.php" class="active">Leave History</a></li>
+            <li><a href="../superadmin/history.php"class="active">Leave History</a></li>
             <li><a href="../superadmin/activitylog.php">Activity Logs</a></li>
         </ul>
     </div>
@@ -326,12 +327,13 @@ if ($colRes && $colRes->num_rows > 0 && $colRes2 && $colRes2->num_rows > 0) {
                             <th style="padding:8px">Status</th>
                             <th style="padding:8px">Requested At</th>
                             <th style="padding:8px">Responded At</th>
+                            <th style="padding:8px">Responded By</th>
                             
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (!$hist || mysqli_num_rows($hist) === 0): ?>
-                            <tr><td colspan="8" style="padding:12px">No requests found.</td></tr>
+                            <tr><td colspan="9" style="padding:12px">No requests found.</td></tr>
                         <?php else: ?>
                             <?php while ($r = mysqli_fetch_assoc($hist)): ?>
                                 <tr style="border-bottom:1px solid #f1f1f1;">
@@ -345,15 +347,17 @@ if ($colRes && $colRes->num_rows > 0 && $colRes2 && $colRes2->num_rows > 0) {
                                     <td style="padding:8px"><?php echo htmlspecialchars($r['responded_at'] ?? ''); ?></td>
                                     <td style="padding:8px">
                                         <?php
-                                            if (!empty($r['responder_firstname']) || !empty($r['responder_lastname'])) {
-                                                $name = trim(($r['responder_firstname'] ?? '') . ' ' . ($r['responder_middlename'] ?? '') . ' ' . ($r['responder_lastname'] ?? ''));
-                                                $display = trim(preg_replace('/\s+/', ' ', $name));
-                                                if (!empty($r['responder_role'])) $display .= ' (' . $r['responder_role'] . ')';
-                                                echo htmlspecialchars($display);
+                                            $responder_username = $r['responded_by'] ?? '';
+                                            $responder_name = trim(($r['responder_firstname'] ?? '') . ' ' . ($r['responder_middlename'] ?? '') . ' ' . ($r['responder_lastname'] ?? ''));
+                                            $responder_name = trim(preg_replace('/\s+/', ' ', $responder_name));
+                                            if (!empty($responder_username) && !empty($responder_name)) {
+                                                echo htmlspecialchars($responder_username . ' (' . $responder_name . ')');
+                                            } elseif (!empty($responder_name)) {
+                                                echo htmlspecialchars($responder_name);
+                                            } elseif (!empty($responder_username)) {
+                                                echo htmlspecialchars($responder_username);
                                             } else {
-                                                $fallback = $r['responded_by'] ?? '';
-                                                if (!empty($r['responder_role'])) $fallback .= ' (' . $r['responder_role'] . ')';
-                                                echo htmlspecialchars($fallback);
+                                                echo '';
                                             }
                                         ?>
                                     </td>

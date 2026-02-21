@@ -262,6 +262,12 @@ try {
 
         .btn-confirm { background:#28a745; color:white; border:none; padding:10px; flex:1; }
         .btn-cancel  { background:#dc3545; color:white; border:none; padding:10px; flex:1; }
+        /* Pagination */
+        .pager-container { display:flex; justify-content:flex-end; margin-top:12px; }
+        .pager { display:flex; gap:8px; align-items:center; }
+        .pager-btn { padding:6px 10px; background:#1E90FF; color:white; border-radius:6px; text-decoration:none; font-weight:600; }
+        .pager-btn.disabled { background:#e0e0e0; color:#888; pointer-events:none; }
+        .pager-current { padding:6px 10px; background:#ffffff; border-radius:6px; border:1px solid #ddd; min-width:42px; text-align:center; font-weight:600; }
     </style>
 </head>
 
@@ -274,11 +280,12 @@ try {
             <div class="role-label-small">Super Admin</div>
         </div>
         <ul>
-                     <li><a href="../superadmin/dashboard.php" >Dashboard</a></li>
+                              <li><a href="../superadmin/dashboard.php" >Dashboard</a></li>
             <li><a href="../superadmin/user.php" >Block User</a></li>
+            <li><a href="../superadmin/role.php" >Manage Role</a></li>
             <li><a href="../superadmin/manage.php">Manage User List</a></li>
             <li><a href="../superadmin/history.php">Leave History</a></li>
-            <li><a href="../superadmin/activitylog.php" class="active">Activity Logs</a></li>
+            <li><a href="../superadmin/activitylog.php"class="active">Activity Logs</a></li>
         </ul>
     </div>
 
@@ -310,19 +317,38 @@ try {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-        // Fetch recent activity for users with role admin or user
+        // Pagination setup: show 5 rows per page
+        $perPage = 5;
+        $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+        $offset = ($page - 1) * $perPage;
+
+        // Count total rows matching roles
+        $totalRows = 0;
+        $countSql = "SELECT COUNT(*) as cnt FROM activity_log al LEFT JOIN users u ON al.username = u.username WHERE u.role IN ('admin','user','superadmin')";
+        $cres = $conn->query($countSql);
+        if ($cres) {
+            $crow = $cres->fetch_assoc();
+            $totalRows = (int)($crow['cnt'] ?? 0);
+        }
+        $totalPages = max(1, (int)ceil($totalRows / $perPage));
+
+        // Fetch paginated logs
         $logs = [];
         $sql = "SELECT al.username, al.action, al.device_name, al.ip, al.created_at,
                        u.firstname, u.middlename, u.lastname, u.suffix, u.role
                 FROM activity_log al
                 LEFT JOIN users u ON al.username = u.username
-                WHERE u.role IN ('admin','user')
-                ORDER BY al.created_at DESC";
-        $res = $conn->query($sql);
-        if ($res) {
+            WHERE u.role IN ('admin','user','superadmin')
+                ORDER BY al.created_at DESC
+                LIMIT ?, ?";
+        if ($stmt = $conn->prepare($sql)) {
+            $stmt->bind_param('ii', $offset, $perPage);
+            $stmt->execute();
+            $res = $stmt->get_result();
             while ($row = $res->fetch_assoc()) {
                 $logs[] = $row;
             }
+            $stmt->close();
         }
         ?>
 
@@ -359,6 +385,23 @@ try {
                 <?php endif; ?>
                 </tbody>
             </table>
+            </div>
+            <div class="pager-container">
+                <div class="pager" role="navigation" aria-label="Pagination">
+                    <?php if ($page > 1): ?>
+                        <a class="pager-btn" href="?page=<?php echo $page - 1; ?>">Prev</a>
+                    <?php else: ?>
+                        <span class="pager-btn disabled">Prev</span>
+                    <?php endif; ?>
+
+                    <span class="pager-current"><?php echo $page; ?></span>
+
+                    <?php if ($page < $totalPages): ?>
+                        <a class="pager-btn" href="?page=<?php echo $page + 1; ?>">Next</a>
+                    <?php else: ?>
+                        <span class="pager-btn disabled">Next</span>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
 
