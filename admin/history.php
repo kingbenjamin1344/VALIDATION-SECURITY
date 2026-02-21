@@ -2,23 +2,22 @@
 session_start();
 require_once __DIR__ . '/../regform/config.php';
 
-// Access control: only upper_management can access
+// Access control: only admin can access
 if (!isset($_SESSION['username'])) {
     header('Location: ../logform/login.php');
     exit();
 }
 $role = isset($_SESSION['role']) ? $_SESSION['role'] : null;
-if ($role !== 'upper_management') {
-    // redirect according to actual role
+if ($role !== 'admin') {
     if ($role === 'superadmin') header('Location: ../superadmin/dashboard.php');
-    elseif ($role === 'admin') header('Location: ../admin/dashboard.php');
+    elseif ($role === 'upper_management') header('Location: ../upper_management/dashboard.php');
     else header('Location: ../logform/indexes.php');
     exit();
 }
-// Fetch upper management user info for display
-$um_first = '';
-$um_last = '';
-$um_initials = '';
+// Fetch admin user info for display
+$adm_first = '';
+$adm_last = '';
+$adm_initials = '';
 if (isset($_SESSION['username'])) {
     $uname = $_SESSION['username'];
     $pst = $conn->prepare('SELECT firstname, lastname FROM users WHERE username = ? LIMIT 1');
@@ -28,62 +27,43 @@ if (isset($_SESSION['username'])) {
         $gres = $pst->get_result();
         if ($gres && $gres->num_rows) {
             $rw = $gres->fetch_assoc();
-            $um_first = $rw['firstname'] ?? '';
-            $um_last = $rw['lastname'] ?? '';
-            $um_initials = strtoupper(substr(($um_first ?: 'U'),0,1) . substr(($um_last ?: ' '),0,1));
+            $adm_first = $rw['firstname'] ?? '';
+            $adm_last = $rw['lastname'] ?? '';
+            $adm_initials = strtoupper(substr(($adm_first ?: 'A'),0,1) . substr(($adm_last ?: ' '),0,1));
         }
         $pst->close();
     }
 }
 
-// Fetch counts for roles
-$countSuper = 0; $countAdmin = 0; $countUser = 0;
+// Fetch counts: total users (only role = 'user') and leave status totals
+$totalUsers = 0;
+$pendingLeaves = 0;
+$approvedLeaves = 0;
+$declinedLeaves = 0;
 try {
-    $r = $conn->query("SELECT role, COUNT(*) as cnt FROM users GROUP BY role");
+    $r = $conn->query("SELECT COUNT(*) as cnt FROM users WHERE role='user'");
     if ($r) {
-        while ($row = $r->fetch_assoc()) {
-            $roleName = $row['role'];
-            $cnt = (int)$row['cnt'];
-            if ($roleName === 'superadmin') $countSuper = $cnt;
-            elseif ($roleName === 'admin') $countAdmin = $cnt;
-            elseif ($roleName === 'user') $countUser = $cnt;
-        }
+        $row = $r->fetch_assoc();
+        $totalUsers = (int)($row['cnt'] ?? 0);
+    }
+    $l = $conn->query("SELECT SUM(status = 'pending') as pending, SUM(status = 'approved') as approved, SUM(status = 'declined') as declined FROM leave_requests");
+    if ($l) {
+        $lr = $l->fetch_assoc();
+        $pendingLeaves = (int)($lr['pending'] ?? 0);
+        $approvedLeaves = (int)($lr['approved'] ?? 0);
+        $declinedLeaves = (int)($lr['declined'] ?? 0);
     }
 } catch (mysqli_sql_exception $e) {
-    // ignore errors; counts remain 0
+    // keep defaults on error
 }
-
-// Overall count
-$countOverall = $countSuper + $countAdmin + $countUser;
-
-// Handle role update (moved from addrole.php)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_id']) && isset($_POST['role'])) {
-    $uid = (int)$_POST['user_id'];
-    $newrole = mysqli_real_escape_string($conn, $_POST['role']);
-
-    // Update users.role
-    mysqli_query($conn, "UPDATE users SET role='". $newrole ."' WHERE id=". $uid);
-
-    // Remove from role tables
-    mysqli_query($conn, "DELETE FROM upper_management WHERE user_id=". $uid);
-    mysqli_query($conn, "DELETE FROM superadmin WHERE user_id=". $uid);
-    mysqli_query($conn, "DELETE FROM admin WHERE user_id=". $uid);
-
-    // Insert into chosen role table if applicable
-    if ($newrole === 'upper_management') {
-        mysqli_query($conn, "INSERT INTO upper_management (user_id) VALUES (". $uid .")");
-    } elseif ($newrole === 'superadmin') {
-        mysqli_query($conn, "INSERT INTO superadmin (user_id) VALUES (". $uid .")");
-    } elseif ($newrole === 'admin') {
-        mysqli_query($conn, "INSERT INTO admin (user_id) VALUES (". $uid .")");
-    }
-
-    header('Location: manage.php?updated=1');
-    exit;
+// Fetch approved and declined leaves for history (avoid error if responded_at column missing)
+$colRes = $conn->query("SHOW COLUMNS FROM leave_requests LIKE 'responded_at'");
+if ($colRes && $colRes->num_rows > 0) {
+    $hist = $conn->query("SELECT id, username, leave_type, start_date, end_date, reason, status, created_at, responded_at FROM leave_requests WHERE status IN ('approved','declined') ORDER BY created_at DESC");
+} else {
+    // responded_at not present yet; select NULL placeholder
+    $hist = $conn->query("SELECT id, username, leave_type, start_date, end_date, reason, status, created_at, NULL as responded_at FROM leave_requests WHERE status IN ('approved','declined') ORDER BY created_at DESC");
 }
-
-// Fetch users with expanded name fields
-$users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix, email, username, role FROM users ORDER BY id DESC");
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -297,6 +277,12 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
 
         .btn-confirm { background:#28a745; color:white; border:none; padding:10px; flex:1; }
         .btn-cancel  { background:#dc3545; color:white; border:none; padding:10px; flex:1; }
+        .btn-view-address { background:#0b61d0; color:white; border:none; padding:6px 10px; border-radius:4px; cursor:pointer }
+        .btn-approve { background:#28a745; color:white; border:none; padding:6px 8px; border-radius:4px; cursor:pointer }
+        .btn-decline { background:#dc3545; color:white; border:none; padding:6px 8px; border-radius:4px; cursor:pointer }
+        .status-approved { color: #ff0000; font-weight:600 }
+        .status-declined { color: #008000; font-weight:600 }
+        .status-pending { color: #6c757d; font-weight:600 }
     </style>
 </head>
 
@@ -305,25 +291,25 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
     <!-- Left Sidebar -->
     <div class="left-sidebar">
         <div class="role-area">
-            <div class="role-circle-small">UM</div>
-            <div class="role-label-small">Upper Management</div>
+            <div class="role-circle-small">A</div>
+            <div class="role-label-small">Admin</div>
         </div>
         <ul>
-            <li><a href="../upper_management/dashboard.php" >Dashboard</a></li>
-            <li><a href="../upper_management/manage.php" class="active">Manage Roles</a></li>
-            <li><a href="../upper_management/userlist.php">Userlist</a></li>
-             <li><a href="../upper_management/activity.php">Activity Logs</a></li>
+            <li><a href="../admin/dashboard.php" >Dashboard</a></li>
+            <li><a href="../admin/userlist.php">User List</a></li>
+            <li><a href="../admin/leave.php">Pending Requests</a></li>
+            <li><a href="../admin/history.php" class="active">Leave History</a></li>
         </ul>
     </div>
 
     <!-- Top Navbar -->
     <div class="top-navbar">
-      
+        <span class="settings-icon" onclick="toggleSidebar()">&#9881;</span>
         <div class="navbar-title">Leave Management</div>
 
         <div class="profile">
-            <div class="profile-circle"><?php echo htmlspecialchars($um_initials ?: 'UM'); ?></div>
-            <div class="profile-name"><?php echo htmlspecialchars(trim($um_first . ' ' . $um_last) ?: ($_SESSION['username'] ?? 'Upper Management')); ?></div>
+            <div class="profile-circle"><?php echo htmlspecialchars($adm_initials ?: 'A'); ?></div>
+            <div class="profile-name"><?php echo htmlspecialchars(trim($adm_first . ' ' . $adm_last) ?: ($_SESSION['username'] ?? 'Admin')); ?></div>
         </div>
 
         <span class="logout-icon" onclick="logout()">
@@ -333,61 +319,51 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
 
     <!-- Main -->
     <main>
-        <div style="max-width:1100px;margin:0 auto;padding:6px;">
-            <h1>Manage Roles</h1>
-            <?php if (isset($_GET['updated'])): ?>
-                <div style="background:#e6ffed;border:1px solid #b7f3c7;padding:10px;border-radius:6px;color:#155724;margin-bottom:12px;">Role updated.</div>
-            <?php endif; ?>
-
-            <div style="background:#fff;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06);">
-                <table style="width:100%;border-collapse:collapse;">
-                    <thead>
-                        <tr style="text-align:left;border-bottom:1px solid #eee;">
-                            <th style="padding:8px">First</th>
-                            <th style="padding:8px">Middle</th>
-                            <th style="padding:8px">Last</th>
-                            <th style="padding:8px">Suffix</th>
-                            <th style="padding:8px">Email</th>
-                            <th style="padding:8px">Username</th>
-                            <th style="padding:8px">Role</th>
-                            <th style="padding:8px">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (!$users || mysqli_num_rows($users) === 0): ?>
-                            <tr><td colspan="8" style="padding:12px">No users found.</td></tr>
-                        <?php else: ?>
-                            <?php while ($row = mysqli_fetch_assoc($users)): ?>
-                                <tr style="border-bottom:1px solid #f1f1f1;">
-                                    <td style="padding:8px"><?= htmlspecialchars($row['firstname']) ?></td>
-                                    <td style="padding:8px"><?= htmlspecialchars($row['middlename']) ?></td>
-                                    <td style="padding:8px"><?= htmlspecialchars($row['lastname']) ?></td>
-                                    <td style="padding:8px"><?= htmlspecialchars($row['suffix']) ?></td>
-                                    <td style="padding:8px"><?= htmlspecialchars($row['email']) ?></td>
-                                    <td style="padding:8px"><?= htmlspecialchars($row['username']) ?></td>
-                                    <td style="padding:8px"><?= htmlspecialchars($row['role']) ?></td>
-                                    <td style="padding:8px">
-                                        <form method="post" style="display:flex;gap:6px;align-items:center;">
-                                            <input type="hidden" name="user_id" value="<?= (int)$row['id'] ?>">
-                                            <select name="role" style="padding:6px;border-radius:4px;border:1px solid #ddd;">
-                                                <option value="user" <?= $row['role']==='user'?'selected':'' ?>>user</option>
-                                                <option value="admin" <?= $row['role']==='admin'?'selected':'' ?>>admin</option>
-                                                <option value="superadmin" <?= $row['role']==='superadmin'?'selected':'' ?>>superadmin</option>
-                  
-                                            </select>
-                                            <button type="submit" style="background:#1E90FF;color:#fff;border:none;padding:8px 10px;border-radius:6px;">Set Role</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            <?php endwhile; ?>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
+        <h2 style="margin-bottom:18px">Leave History (Approved & Declined)</h2>
+        <div style="overflow:auto; background:white; padding:12px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+            <table style="width:100%; border-collapse:collapse">
+                <thead>
+                    <tr style="background:#f1f5f9; text-align:left">
+                        
+                        <th style="padding:8px">Username</th>
+                        <th style="padding:8px">Type</th>
+                        <th style="padding:8px">Start</th>
+                        <th style="padding:8px">End</th>
+                        <th style="padding:8px">Reason</th>
+                        <th style="padding:8px">Status</th>
+                        <th style="padding:8px">Requested</th>
+                            <th style="padding:8px">Responded</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if (!$hist || $hist->num_rows === 0): ?>
+                    <tr><td colspan="8" style="padding:12px">No history records found.</td></tr>
+                <?php else: $i=1; while ($r = $hist->fetch_assoc()): ?>
+                    <tr>
+                        
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['username']); ?></td>
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['leave_type']); ?></td>
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['start_date']); ?></td>
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['end_date']); ?></td>
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['reason']); ?></td>
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars(ucfirst($r['status'])); ?></td>
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['created_at']); ?></td>
+                            <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['responded_at'] ?? '-'); ?></td>
+                    </tr>
+                <?php endwhile; endif; ?>
+                </tbody>
+            </table>
         </div>
+ 
     </main>
 
-  
+    <!-- Right Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <span class="close-btn" onclick="toggleSidebar()">&times;</span>
+        <ul>
+            <li><a href="../security/input_security_question.php">Set Security</a></li>
+        </ul>
+    </div>
 
     <!-- Logout Modal -->
     <div id="logoutModal" class="modal-overlay">
@@ -415,7 +391,7 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
     }
 
     function confirmLogout() {
-        // Redirect to server logout which destroys session and redirects to login.php
+        // Redirect to server logout which destroys session and redirects to login
         window.location.href = '../logform/logout.php';
     }
 </script>

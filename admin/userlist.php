@@ -56,6 +56,8 @@ try {
 } catch (mysqli_sql_exception $e) {
     // keep defaults on error
 }
+// Fetch users for list
+$users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix, age, birthdate, email, username, purok, barangay, municipality, country, zipcode FROM users ORDER BY id DESC");
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -269,6 +271,15 @@ try {
 
         .btn-confirm { background:#28a745; color:white; border:none; padding:10px; flex:1; }
         .btn-cancel  { background:#dc3545; color:white; border:none; padding:10px; flex:1; }
+        /* Custom action buttons */
+        .btn-view-address { background:#0b61d0; color:white; border:none; padding:6px 10px; border-radius:4px; cursor:pointer; }
+        .btn-view-address:hover { opacity:0.95 }
+        .btn-approve { background:#28a745; color:white; border:none; padding:6px 8px; border-radius:4px; cursor:pointer }
+        .btn-decline { background:#dc3545; color:white; border:none; padding:6px 8px; border-radius:4px; cursor:pointer }
+        /* Status text colors */
+        .status-approved { color: #ff0000; font-weight:600 } /* approved -> red font */
+        .status-declined { color: #008000; font-weight:600 } /* declined -> green font */
+        .status-pending { color: #6c757d; font-weight:600 } /* pending -> gray font */
     </style>
 </head>
 
@@ -281,9 +292,9 @@ try {
             <div class="role-label-small">Admin</div>
         </div>
         <ul>
-            <li><a href="../admin/dashboard.php" class="active">Dashboard</a></li>
-            <li><a href="../admin/userlist.php">User List</a></li>
-            <li><a href="../admin/leave.php">Pending Requests</a></li>
+            <li><a href="../admin/dashboard.php" >Dashboard</a></li>
+            <li><a href="../admin/userlist.php" class="active">User List</a></li>
+            <li><a href="../admin/leave.php">Pending Request</a></li>
             <li><a href="../admin/history.php">Leave History</a></li>
         </ul>
     </div>
@@ -305,23 +316,45 @@ try {
 
     <!-- Main -->
     <main>
-        <div class="cards">
-            <div class="card">
-                <h2><?php echo (int)$totalUsers; ?></h2>
-                <p>Total Users</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$pendingLeaves; ?></h2>
-                <p>Pending Leaves</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$approvedLeaves; ?></h2>
-                <p>Approved Leaves</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$declinedLeaves; ?></h2>
-                <p>Declined Requests</p>
-            </div>
+        <h2 style="margin-bottom:18px">User List</h2>
+        <div style="overflow:auto; background:white; padding:12px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+            <table style="width:100%; border-collapse:collapse">
+                <thead>
+                    <tr style="background:#f1f5f9; text-align:left">
+                        
+                        <th style="padding:8px">Name</th>
+                        <th style="padding:8px">Age</th>
+                        <th style="padding:8px">Birthdate</th>
+                        <th style="padding:8px">Email</th>
+                        <th style="padding:8px">Username</th>
+                        <th style="padding:8px">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if (!$users || mysqli_num_rows($users) === 0): ?>
+                    <tr><td colspan="7" style="padding:12px">No users found.</td></tr>
+                <?php else: $i=1; while ($row = mysqli_fetch_assoc($users)): ?>
+                    <tr>
+
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars(trim($row['firstname'].' '.($row['middlename']?:'').' '.$row['lastname'].' '.($row['suffix']?:''))); ?></td>
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($row['age']); ?></td>
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($row['birthdate']); ?></td>
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($row['email']); ?></td>
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($row['username']); ?></td>
+                        <td style="padding:8px; vertical-align:top">
+                            <button class="btn-view-address" 
+                                data-purok="<?php echo htmlspecialchars($row['purok']); ?>" 
+                                data-barangay="<?php echo htmlspecialchars($row['barangay']); ?>" 
+                                data-municipality="<?php echo htmlspecialchars($row['municipality']); ?>" 
+                                data-country="<?php echo htmlspecialchars($row['country']); ?>" 
+                                data-zipcode="<?php echo htmlspecialchars($row['zipcode']); ?>">
+                                View Address
+                            </button>
+                        </td>
+                    </tr>
+                <?php endwhile; endif; ?>
+                </tbody>
+            </table>
         </div>
     </main>
 
@@ -333,6 +366,18 @@ try {
         </ul>
     </div>
 
+    <!-- Address Sidebar -->
+    <div class="sidebar" id="addressSidebar" style="right:-360px; width:360px; background:#fff; color:#222;">
+        <span class="close-btn" onclick="closeAddressSidebar()">&times;</span>
+        <h3 style="margin-top:24px">Address</h3>
+        <div id="addressContent" style="margin-top:12px; color:#111">
+            <p><strong>Purok:</strong> <span id="addrPurok"></span></p>
+            <p><strong>Barangay:</strong> <span id="addrBarangay"></span></p>
+            <p><strong>Municipality:</strong> <span id="addrMunicipality"></span></p>
+            <p><strong>Country:</strong> <span id="addrCountry"></span></p>
+            <p><strong>Zipcode:</strong> <span id="addrZipcode"></span></p>
+        </div>
+    </div>
     <!-- Logout Modal -->
     <div id="logoutModal" class="modal-overlay">
         <div class="modal-box">
@@ -362,6 +407,28 @@ try {
         // Redirect to server logout which destroys session and redirects to login
         window.location.href = '../logform/logout.php';
     }
+
+    // Address sidebar handling
+    function openAddressSidebar() {
+        const sb = document.getElementById('addressSidebar');
+        sb.style.right = '0';
+    }
+    function closeAddressSidebar() {
+        const sb = document.getElementById('addressSidebar');
+        sb.style.right = '-360px';
+    }
+
+    document.addEventListener('click', function(e){
+        if (e.target && e.target.classList.contains('btn-view-address')) {
+            const btn = e.target;
+            document.getElementById('addrPurok').textContent = btn.getAttribute('data-purok') || '-';
+            document.getElementById('addrBarangay').textContent = btn.getAttribute('data-barangay') || '-';
+            document.getElementById('addrMunicipality').textContent = btn.getAttribute('data-municipality') || '-';
+            document.getElementById('addrCountry').textContent = btn.getAttribute('data-country') || '-';
+            document.getElementById('addrZipcode').textContent = btn.getAttribute('data-zipcode') || '-';
+            openAddressSidebar();
+        }
+    });
 </script>
 
 </body>

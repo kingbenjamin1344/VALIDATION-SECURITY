@@ -50,7 +50,7 @@ try {
 </head>
 <body>
     <div style="padding:20px;max-width:1100px;margin:0 auto;">
-        <h1>Leave Requests</h1>
+        <h1>Pending Request</h1>
         <table>
             <thead>
                 <tr>

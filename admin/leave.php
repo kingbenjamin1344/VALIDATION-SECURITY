@@ -56,6 +56,41 @@ try {
 } catch (mysqli_sql_exception $e) {
     // keep defaults on error
 }
+// Handle approve/decline actions (support AJAX)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['id'])) {
+    $action = $_POST['action'];
+    $id = (int)$_POST['id'];
+    if (in_array($action, ['approve','decline'])) {
+        $newStatus = $action === 'approve' ? 'approved' : 'declined';
+
+        // ensure responded_at column exists
+        $colRes = $conn->query("SHOW COLUMNS FROM leave_requests LIKE 'responded_at'");
+        if ($colRes && $colRes->num_rows === 0) {
+            $conn->query("ALTER TABLE leave_requests ADD COLUMN responded_at DATETIME NULL");
+        }
+
+        $up = $conn->prepare("UPDATE leave_requests SET status = ?, responded_at = NOW() WHERE id = ?");
+        if ($up) {
+            $up->bind_param('si', $newStatus, $id);
+            $up->execute();
+            $up->close();
+        }
+    }
+
+    // If AJAX request, return JSON and do not redirect
+    $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+    if ($isAjax) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => true, 'status' => $newStatus, 'id' => $id]);
+        exit();
+    }
+
+    header('Location: leave.php');
+    exit();
+}
+
+// Fetch leave requests
+$leaves = $conn->query("SELECT id, username, leave_type, start_date, end_date, reason, status, created_at FROM leave_requests WHERE status = 'pending' ORDER BY created_at DESC");
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -269,6 +304,12 @@ try {
 
         .btn-confirm { background:#28a745; color:white; border:none; padding:10px; flex:1; }
         .btn-cancel  { background:#dc3545; color:white; border:none; padding:10px; flex:1; }
+        .btn-view-address { background:#0b61d0; color:white; border:none; padding:6px 10px; border-radius:4px; cursor:pointer }
+        .btn-approve { background:#28a745; color:white; border:none; padding:6px 8px; border-radius:4px; cursor:pointer }
+        .btn-decline { background:#dc3545; color:white; border:none; padding:6px 8px; border-radius:4px; cursor:pointer }
+        .status-approved { color: #ff0000; font-weight:600 }
+        .status-declined { color: #008000; font-weight:600 }
+        .status-pending { color: #6c757d; font-weight:600 }
     </style>
 </head>
 
@@ -281,9 +322,9 @@ try {
             <div class="role-label-small">Admin</div>
         </div>
         <ul>
-            <li><a href="../admin/dashboard.php" class="active">Dashboard</a></li>
+            <li><a href="../admin/dashboard.php" >Dashboard</a></li>
             <li><a href="../admin/userlist.php">User List</a></li>
-            <li><a href="../admin/leave.php">Pending Requests</a></li>
+            <li><a href="../admin/leave.php" class="active">Pending Request</a></li>
             <li><a href="../admin/history.php">Leave History</a></li>
         </ul>
     </div>
@@ -305,23 +346,49 @@ try {
 
     <!-- Main -->
     <main>
-        <div class="cards">
-            <div class="card">
-                <h2><?php echo (int)$totalUsers; ?></h2>
-                <p>Total Users</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$pendingLeaves; ?></h2>
-                <p>Pending Leaves</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$approvedLeaves; ?></h2>
-                <p>Approved Leaves</p>
-            </div>
-            <div class="card">
-                <h2><?php echo (int)$declinedLeaves; ?></h2>
-                <p>Declined Requests</p>
-            </div>
+        <h2 style="margin-bottom:18px">Pending Request</h2>
+        <div style="overflow:auto; background:white; padding:12px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+            <table style="width:100%; border-collapse:collapse">
+                <thead>
+                    <tr style="background:#f1f5f9; text-align:left">
+                        
+                        <th style="padding:8px">Username</th>
+                        <th style="padding:8px">Type</th>
+                        <th style="padding:8px">Start</th>
+                        <th style="padding:8px">End</th>
+                        <th style="padding:8px">Reason</th>
+                        <th style="padding:8px">Status</th>
+                        <th style="padding:8px">Requested</th>
+                        <th style="padding:8px">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if (!$leaves || $leaves->num_rows === 0): ?>
+                    <tr><td colspan="8" style="padding:12px">No leave requests found.</td></tr>
+                <?php else: $i=1; while ($r = $leaves->fetch_assoc()): ?>
+                    <tr>
+                      
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['username']); ?></td>
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['leave_type']); ?></td>
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['start_date']); ?></td>
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['end_date']); ?></td>
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['reason']); ?></td>
+                        <td style="padding:8px; vertical-align:top">
+                            <?php $s = $r['status']; $sc = ($s==='approved'?'status-approved':($s==='declined'?'status-declined':'status-pending')); echo '<span class="'.$sc.'">'.htmlspecialchars(ucfirst($s)).'</span>'; ?>
+                        </td>
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['created_at']); ?></td>
+                        <td style="padding:8px; vertical-align:top">
+                            <?php if ($r['status'] === 'pending'): ?>
+                                <button class="btn-approve action-btn" data-id="<?php echo (int)$r['id']; ?>" data-action="approve" style="margin-right:6px">Approve</button>
+                                <button class="btn-decline action-btn" data-id="<?php echo (int)$r['id']; ?>" data-action="decline">Decline</button>
+                            <?php else: ?>
+                                —
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endwhile; endif; ?>
+                </tbody>
+            </table>
         </div>
     </main>
 
@@ -345,6 +412,18 @@ try {
         </div>
     </div>
 
+    <!-- Action Modal -->
+    <div id="actionModal" class="modal-overlay">
+        <div class="modal-box">
+            <h3 id="actionTitle">Confirm</h3>
+            <p id="actionMessage">Are you sure?</p>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeActionModal()">Cancel</button>
+                <button class="btn-confirm" id="actionConfirm">Ok</button>
+            </div>
+        </div>
+    </div>
+
 <script>
     function toggleSidebar() {
         document.getElementById('sidebar').classList.toggle('open');
@@ -362,6 +441,59 @@ try {
         // Redirect to server logout which destroys session and redirects to login
         window.location.href = '../logform/logout.php';
     }
+
+    // Action modal handling
+    function openActionModal(title, message, id, action) {
+        const modal = document.getElementById('actionModal');
+        document.getElementById('actionTitle').textContent = title;
+        document.getElementById('actionMessage').textContent = message;
+        modal.style.display = 'flex';
+        modal.dataset.targetId = id;
+        modal.dataset.action = action;
+    }
+    function closeActionModal() {
+        const modal = document.getElementById('actionModal');
+        modal.style.display = 'none';
+        delete modal.dataset.targetId;
+        delete modal.dataset.action;
+    }
+
+    document.addEventListener('click', function(e){
+        const btn = e.target.closest('.action-btn');
+        if (!btn) return;
+        const id = btn.getAttribute('data-id');
+        const action = btn.getAttribute('data-action');
+        const title = action === 'approve' ? 'Approve Request Leave' : 'Decline Request Leave';
+        const message = action === 'approve' ? 'Approve this leave request?' : 'Decline this leave request?';
+        openActionModal(title, message, id, action);
+    });
+
+    document.getElementById('actionConfirm').addEventListener('click', function(){
+        const modal = document.getElementById('actionModal');
+        const id = modal.dataset.targetId;
+        const action = modal.dataset.action;
+        if (!id || !action) { closeActionModal(); return; }
+
+        const form = new FormData();
+        form.append('id', id);
+        form.append('action', action);
+
+        fetch('leave.php', { method: 'POST', body: form, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.success) {
+                    // remove row from table
+                    const btn = document.querySelector('.action-btn[data-id="'+id+'"]');
+                    if (btn) {
+                        const tr = btn.closest('tr');
+                        if (tr) tr.remove();
+                    }
+                }
+                closeActionModal();
+            }).catch(err => {
+                closeActionModal();
+            });
+    });
 </script>
 
 </body>
