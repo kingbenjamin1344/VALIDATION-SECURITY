@@ -104,10 +104,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_cancel'], $_PO
     }
 }
 
-// Fetch user's requests for listing
+// Fetch user's pending requests for listing (only pending should be visible)
 $userRequests = [];
 try {
-    $ur = $conn->prepare("SELECT id, leave_type, start_date, end_date, reason, status, created_at FROM leave_requests WHERE username = ? ORDER BY created_at DESC");
+    $ur = $conn->prepare("SELECT id, leave_type, start_date, end_date, reason, status, created_at FROM leave_requests WHERE username = ? AND status = 'pending' ORDER BY created_at DESC");
     if ($ur) {
         $ur->bind_param('s', $username);
         $ur->execute();

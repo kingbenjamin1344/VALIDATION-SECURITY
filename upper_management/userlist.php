@@ -294,9 +294,12 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
             <div class="role-label-small">Upper Management</div>
         </div>
         <ul>
-            <li><a href="../upper_management/dashboard.php" >Dashboard</a></li>
+             <li><a href="../upper_management/dashboard.php" >Dashboard</a></li>
+            <li><a href="../upper_management/block.php">Block User</a></li>
             <li><a href="../upper_management/manage.php">Manage Roles</a></li>
             <li><a href="../upper_management/userlist.php" class="active">Userlist</a></li>
+             <li><a href="../upper_management/activity.php">Activity Logs</a></li>
+            
         </ul>
     </div>
     <!-- Delete Confirmation Modal -->

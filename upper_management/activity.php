@@ -268,6 +268,12 @@ $countOverall = $countSuper + $countAdmin + $countUser;
 
         .btn-confirm { background:#28a745; color:white; border:none; padding:10px; flex:1; }
         .btn-cancel  { background:#dc3545; color:white; border:none; padding:10px; flex:1; }
+            /* Pagination */
+            .pager-container { display:flex; justify-content:flex-end; margin-top:12px; }
+            .pager { display:flex; gap:8px; align-items:center; }
+            .pager-btn { padding:6px 10px; background:#1E90FF; color:white; border-radius:6px; text-decoration:none; font-weight:600; }
+            .pager-btn.disabled { background:#e0e0e0; color:#888; pointer-events:none; }
+            .pager-current { padding:6px 10px; background:#ffffff; border-radius:6px; border:1px solid #ddd; min-width:42px; text-align:center; font-weight:600; }
     </style>
 </head>
 
@@ -280,7 +286,8 @@ $countOverall = $countSuper + $countAdmin + $countUser;
             <div class="role-label-small">Upper Management</div>
         </div>
         <ul>
-            <li><a href="../upper_management/dashboard.php" >Dashboard</a></li>
+           <li><a href="../upper_management/dashboard.php">Dashboard</a></li>
+            <li><a href="../upper_management/block.php" >Block User</a></li>
             <li><a href="../upper_management/manage.php">Manage Roles</a></li>
             <li><a href="../upper_management/userlist.php">Userlist</a></li>
              <li><a href="../upper_management/activity.php" class="active">Activity Logs</a></li>
@@ -305,7 +312,106 @@ $countOverall = $countSuper + $countAdmin + $countUser;
     <!-- Main -->
     <main>
        
-    
+       
+        <?php
+        // Ensure activity_log table exists
+        @mysqli_query($conn, "CREATE TABLE IF NOT EXISTS activity_log (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            username VARCHAR(100) NOT NULL,
+            action VARCHAR(20) NOT NULL,
+            device_name TEXT,
+            ip VARCHAR(45),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        // Pagination setup: show 5 rows per page
+        $perPage = 5;
+        $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+        $offset = ($page - 1) * $perPage;
+
+        // Count total rows matching roles
+        $totalRows = 0;
+        $countSql = "SELECT COUNT(*) as cnt FROM activity_log al LEFT JOIN users u ON al.username = u.username WHERE u.role IN ('admin','user','superadmin')";
+        $cres = $conn->query($countSql);
+        if ($cres) {
+            $crow = $cres->fetch_assoc();
+            $totalRows = (int)($crow['cnt'] ?? 0);
+        }
+        $totalPages = max(1, (int)ceil($totalRows / $perPage));
+
+        // Fetch paginated logs
+        $logs = [];
+        $sql = "SELECT al.username, al.action, al.device_name, al.ip, al.created_at,
+                       u.firstname, u.middlename, u.lastname, u.suffix, u.role
+                FROM activity_log al
+                LEFT JOIN users u ON al.username = u.username
+            WHERE u.role IN ('admin','user','superadmin')
+                ORDER BY al.created_at DESC
+                LIMIT ?, ?";
+        if ($stmt = $conn->prepare($sql)) {
+            $stmt->bind_param('ii', $offset, $perPage);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            while ($row = $res->fetch_assoc()) {
+                $logs[] = $row;
+            }
+            $stmt->close();
+        }
+        ?>
+
+        <div class="card">
+            <h2>Activity Logs</h2>
+            <div style="overflow:auto">
+            <table style="width:100%;border-collapse:collapse;margin-top:10px;">
+                <thead>
+                    <tr style="text-align:left;border-bottom:2px solid #eee;">
+                        <th style="padding:8px">Full Name</th>
+                        <th style="padding:8px">Action</th>
+                        <th style="padding:8px">Device</th>
+                        <th style="padding:8px">Date & Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if (count($logs) === 0): ?>
+                    <tr><td colspan="4" style="padding:12px;text-align:center;color:#666">No activity logs found.</td></tr>
+                <?php else: ?>
+                    <?php foreach ($logs as $l):
+                        $fname = trim(($l['firstname'] ?? '') . ' ' . ($l['middlename'] ?? '') . ' ' . ($l['lastname'] ?? '') . ' ' . ($l['suffix'] ?? ''));
+                        $displayName = $fname !== '' ? preg_replace('/\s+/', ' ', $fname) : ($l['username'] ?? '');
+                        $action = htmlspecialchars($l['action'] ?? '');
+                        $device = htmlspecialchars($l['device_name'] ?? '');
+                        $dt = htmlspecialchars($l['created_at'] ?? '');
+                    ?>
+                        <tr style="border-bottom:1px solid #f0f0f0;">
+                            <td style="padding:8px"><?php echo htmlspecialchars($displayName); ?><?php echo isset($l['role']) ? ' (' . htmlspecialchars($l['role']) . ')' : ''; ?></td>
+                            <td style="padding:8px;text-transform:capitalize"><?php echo $action; ?></td>
+                            <td style="padding:8px;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?php echo $device; ?></td>
+                            <td style="padding:8px"><?php echo $dt; ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                </tbody>
+            </table>
+            </div>
+            <div class="pager-container">
+                <div class="pager" role="navigation" aria-label="Pagination">
+                    <?php if ($page > 1): ?>
+                        <a class="pager-btn" href="?page=<?php echo $page - 1; ?>">Prev</a>
+                    <?php else: ?>
+                        <span class="pager-btn disabled">Prev</span>
+                    <?php endif; ?>
+
+                    <span class="pager-current"><?php echo $page; ?></span>
+
+                    <?php if ($page < $totalPages): ?>
+                        <a class="pager-btn" href="?page=<?php echo $page + 1; ?>">Next</a>
+                    <?php else: ?>
+                        <span class="pager-btn disabled">Next</span>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
     </main>
 
   

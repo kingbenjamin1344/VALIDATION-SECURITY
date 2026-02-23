@@ -94,8 +94,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['id'
     exit();
 }
 
-// Fetch leave requests
-$leaves = $conn->query("SELECT id, username, leave_type, start_date, end_date, reason, status, created_at FROM leave_requests WHERE status = 'pending' ORDER BY created_at DESC");
+// Fetch leave requests (include user's name fields)
+$leaves = $conn->query("SELECT lr.id, lr.username, lr.leave_type, lr.start_date, lr.end_date, lr.reason, lr.status, lr.created_at,
+                               u.firstname, u.middlename, u.lastname, u.suffix
+                        FROM leave_requests lr
+                        LEFT JOIN users u ON lr.username = u.username
+                        WHERE lr.status = 'pending'
+                        ORDER BY lr.created_at DESC");
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -356,7 +361,7 @@ $leaves = $conn->query("SELECT id, username, leave_type, start_date, end_date, r
             <table style="width:100%; border-collapse:collapse">
                 <thead>
                     <tr style="background:#f1f5f9; text-align:left">
-                        
+                        <th style="padding:8px">Full Name</th>
                         <th style="padding:8px">Username</th>
                         <th style="padding:8px">Type</th>
                         <th style="padding:8px">Start</th>
@@ -372,7 +377,11 @@ $leaves = $conn->query("SELECT id, username, leave_type, start_date, end_date, r
                     <tr><td colspan="8" style="padding:12px">No leave requests found.</td></tr>
                 <?php else: $i=1; while ($r = $leaves->fetch_assoc()): ?>
                     <tr>
-                      
+                        <?php
+                            $parts = array_filter([trim($r['firstname'] ?? ''), trim($r['middlename'] ?? ''), trim($r['lastname'] ?? ''), trim($r['suffix'] ?? '')]);
+                            $fullName = $parts ? preg_replace('/\s+/', ' ', implode(' ', $parts)) : ($r['username'] ?? '');
+                        ?>
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($fullName); ?></td>
                         <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['username']); ?></td>
                         <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['leave_type']); ?></td>
                         <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['start_date']); ?></td>

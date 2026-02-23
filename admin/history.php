@@ -59,10 +59,20 @@ try {
 // Fetch approved and declined leaves for history (avoid error if responded_at column missing)
 $colRes = $conn->query("SHOW COLUMNS FROM leave_requests LIKE 'responded_at'");
 if ($colRes && $colRes->num_rows > 0) {
-    $hist = $conn->query("SELECT id, username, leave_type, start_date, end_date, reason, status, created_at, responded_at FROM leave_requests WHERE status IN ('approved','declined') ORDER BY created_at DESC");
+    $hist = $conn->query("SELECT lr.id, lr.username, lr.leave_type, lr.start_date, lr.end_date, lr.reason, lr.status, lr.created_at, lr.responded_at,
+                               u.firstname, u.middlename, u.lastname, u.suffix
+                        FROM leave_requests lr
+                        LEFT JOIN users u ON lr.username = u.username
+                        WHERE lr.status IN ('approved','declined')
+                        ORDER BY lr.created_at DESC");
 } else {
     // responded_at not present yet; select NULL placeholder
-    $hist = $conn->query("SELECT id, username, leave_type, start_date, end_date, reason, status, created_at, NULL as responded_at FROM leave_requests WHERE status IN ('approved','declined') ORDER BY created_at DESC");
+    $hist = $conn->query("SELECT lr.id, lr.username, lr.leave_type, lr.start_date, lr.end_date, lr.reason, lr.status, lr.created_at, NULL as responded_at,
+                               u.firstname, u.middlename, u.lastname, u.suffix
+                        FROM leave_requests lr
+                        LEFT JOIN users u ON lr.username = u.username
+                        WHERE lr.status IN ('approved','declined')
+                        ORDER BY lr.created_at DESC");
 }
 ?>
 <!DOCTYPE html>
@@ -324,7 +334,7 @@ if ($colRes && $colRes->num_rows > 0) {
             <table style="width:100%; border-collapse:collapse">
                 <thead>
                     <tr style="background:#f1f5f9; text-align:left">
-                        
+                        <th style="padding:8px">Full Name</th>
                         <th style="padding:8px">Username</th>
                         <th style="padding:8px">Type</th>
                         <th style="padding:8px">Start</th>
@@ -340,7 +350,11 @@ if ($colRes && $colRes->num_rows > 0) {
                     <tr><td colspan="8" style="padding:12px">No history records found.</td></tr>
                 <?php else: $i=1; while ($r = $hist->fetch_assoc()): ?>
                     <tr>
-                        
+                        <?php
+                            $parts = array_filter([trim($r['firstname'] ?? ''), trim($r['middlename'] ?? ''), trim($r['lastname'] ?? ''), trim($r['suffix'] ?? '')]);
+                            $fullName = $parts ? preg_replace('/\s+/', ' ', implode(' ', $parts)) : ($r['username'] ?? '');
+                        ?>
+                        <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($fullName); ?></td>
                         <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['username']); ?></td>
                         <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['leave_type']); ?></td>
                         <td style="padding:8px; vertical-align:top"><?php echo htmlspecialchars($r['start_date']); ?></td>

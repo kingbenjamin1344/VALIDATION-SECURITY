@@ -15,7 +15,6 @@ if ($role !== 'upper_management') {
     else header('Location: ../logform/indexes.php');
     exit();
 }
-
 // Fetch upper management user info for display
 $um_first = '';
 $um_last = '';
@@ -56,35 +55,29 @@ try {
 
 // Overall count
 $countOverall = $countSuper + $countAdmin + $countUser;
+// Ensure users table has is_blocked column
+$colCheck = $conn->query("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'is_blocked'");
+if (!$colCheck || $colCheck->num_rows === 0) {
+    @ $conn->query("ALTER TABLE users ADD COLUMN is_blocked TINYINT(1) DEFAULT 0");
+}
 
-// Handle role update (moved from addrole.php)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_id']) && isset($_POST['role'])) {
-    $uid = (int)$_POST['user_id'];
-    $newrole = mysqli_real_escape_string($conn, $_POST['role']);
-
-    // Update users.role
-    mysqli_query($conn, "UPDATE users SET role='". $newrole ."' WHERE id=". $uid);
-
-    // Remove from role tables
-    mysqli_query($conn, "DELETE FROM upper_management WHERE user_id=". $uid);
-    mysqli_query($conn, "DELETE FROM superadmin WHERE user_id=". $uid);
-    mysqli_query($conn, "DELETE FROM admin WHERE user_id=". $uid);
-
-    // Insert into chosen role table if applicable
-    if ($newrole === 'upper_management') {
-        mysqli_query($conn, "INSERT INTO upper_management (user_id) VALUES (". $uid .")");
-    } elseif ($newrole === 'superadmin') {
-        mysqli_query($conn, "INSERT INTO superadmin (user_id) VALUES (". $uid .")");
-    } elseif ($newrole === 'admin') {
-        mysqli_query($conn, "INSERT INTO admin (user_id) VALUES (". $uid .")");
+// Handle block/unblock user (from upper management page)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['block_user'])) {
+    $uid = (int)$_POST['block_user'];
+    $cur = $conn->query("SELECT is_blocked FROM users WHERE id=". $uid);
+    $curVal = 0;
+    if ($cur && $cur->num_rows) {
+        $r = $cur->fetch_assoc();
+        $curVal = (int)($r['is_blocked'] ?? 0);
     }
-
-    header('Location: manage.php?updated=1');
+    $newVal = $curVal ? 0 : 1;
+    $conn->query("UPDATE users SET is_blocked=". $newVal ." WHERE id=". $uid);
+    header('Location: block.php');
     exit;
 }
 
-// Fetch users with expanded name fields
-$users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix, email, username, role FROM users ORDER BY id DESC");
+// Fetch users (include admin, user, and superadmin)
+$users = mysqli_query($conn, "SELECT id, firstname, lastname, email, username, role, IFNULL(is_blocked,0) AS is_blocked FROM users WHERE role IN ('admin','user','superadmin') ORDER BY id DESC");
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -310,13 +303,13 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
             <div class="role-label-small">Upper Management</div>
         </div>
         <ul>
-            <li><a href="../upper_management/dashboard.php">Dashboard</a></li>
-            <li><a href="../upper_management/block.php">Block User</a></li>
-            <li><a href="../upper_management/manage.php" class="active">Manage Roles</a></li>
+             <li><a href="../upper_management/dashboard.php">Dashboard</a></li>
+            <li><a href="../upper_management/block.php" class="active">Block User</a></li>
+            <li><a href="../upper_management/manage.php">Manage Roles</a></li>
             <li><a href="../upper_management/userlist.php">Userlist</a></li>
              <li><a href="../upper_management/activity.php">Activity Logs</a></li>
             
-
+            
         </ul>
     </div>
 
@@ -338,48 +331,39 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
     <!-- Main -->
     <main>
         <div style="max-width:1100px;margin:0 auto;padding:6px;">
-            <h1>Manage Roles</h1>
-            <?php if (isset($_GET['updated'])): ?>
-                <div style="background:#e6ffed;border:1px solid #b7f3c7;padding:10px;border-radius:6px;color:#155724;margin-bottom:12px;">Role updated.</div>
-            <?php endif; ?>
+            <h1>User List</h1>
 
             <div style="background:#fff;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06);">
                 <table style="width:100%;border-collapse:collapse;">
                     <thead>
                         <tr style="text-align:left;border-bottom:1px solid #eee;">
-                            <th style="padding:8px">First</th>
-                            <th style="padding:8px">Middle</th>
-                            <th style="padding:8px">Last</th>
-                            <th style="padding:8px">Suffix</th>
+                            <th style="padding:8px">First Name</th>
+                            <th style="padding:8px">Last Name</th>
                             <th style="padding:8px">Email</th>
                             <th style="padding:8px">Username</th>
                             <th style="padding:8px">Role</th>
-                            <th style="padding:8px">Action</th>
+                            <th style="padding:8px">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (!$users || mysqli_num_rows($users) === 0): ?>
-                            <tr><td colspan="8" style="padding:12px">No users found.</td></tr>
+                            <tr><td colspan="6" style="padding:12px">No users found.</td></tr>
                         <?php else: ?>
                             <?php while ($row = mysqli_fetch_assoc($users)): ?>
                                 <tr style="border-bottom:1px solid #f1f1f1;">
-                                    <td style="padding:8px"><?= htmlspecialchars($row['firstname']) ?></td>
-                                    <td style="padding:8px"><?= htmlspecialchars($row['middlename']) ?></td>
-                                    <td style="padding:8px"><?= htmlspecialchars($row['lastname']) ?></td>
-                                    <td style="padding:8px"><?= htmlspecialchars($row['suffix']) ?></td>
-                                    <td style="padding:8px"><?= htmlspecialchars($row['email']) ?></td>
-                                    <td style="padding:8px"><?= htmlspecialchars($row['username']) ?></td>
-                                    <td style="padding:8px"><?= htmlspecialchars($row['role']) ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($row['firstname']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($row['lastname']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($row['email']); ?></td>
+                                    <td style="padding:8px"><?php echo htmlspecialchars($row['username']); ?></td>
+                                    <td style="padding:8px;text-transform:capitalize"><?php echo htmlspecialchars($row['role']); ?></td>
                                     <td style="padding:8px">
-                                        <form method="post" style="display:flex;gap:6px;align-items:center;">
-                                            <input type="hidden" name="user_id" value="<?= (int)$row['id'] ?>">
-                                            <select name="role" style="padding:6px;border-radius:4px;border:1px solid #ddd;">
-                                                <option value="user" <?= $row['role']==='user'?'selected':'' ?>>user</option>
-                                                <option value="admin" <?= $row['role']==='admin'?'selected':'' ?>>admin</option>
-                                                <option value="superadmin" <?= $row['role']==='superadmin'?'selected':'' ?>>superadmin</option>
-                  
-                                            </select>
-                                            <button type="submit" style="background:#1E90FF;color:#fff;border:none;padding:8px 10px;border-radius:6px;">Set Role</button>
+                                        <form method="post" style="display:inline">
+                                            <input type="hidden" name="block_user" value="<?php echo (int)$row['id']; ?>">
+                                            <?php if (!empty($row['is_blocked'])): ?>
+                                                <button type="submit" style="background:#28a745;color:#fff;border:none;padding:6px 8px;border-radius:4px;">Unblock</button>
+                                            <?php else: ?>
+                                                <button type="submit" style="background:#ff8800;color:#fff;border:none;padding:6px 8px;border-radius:4px;">Block</button>
+                                            <?php endif; ?>
                                         </form>
                                     </td>
                                 </tr>

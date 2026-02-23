@@ -281,8 +281,10 @@ $countOverall = $countSuper + $countAdmin + $countUser;
         </div>
         <ul>
             <li><a href="../upper_management/dashboard.php" class="active">Dashboard</a></li>
+            <li><a href="../upper_management/block.php">Block User</a></li>
             <li><a href="../upper_management/manage.php">Manage Roles</a></li>
             <li><a href="../upper_management/userlist.php">Userlist</a></li>
+             <li><a href="../upper_management/activity.php">Activity Logs</a></li>
             
         </ul>
     </div>
