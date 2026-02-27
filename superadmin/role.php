@@ -264,11 +264,14 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
             right: -300px;
             width: 300px;
             height: 100%;
-            background-color: #5a6268;
-            color: white;
+            background-color: #000000;
+            color: #ffffff;
+            font-weight: 500;
+            font-size: 16px;
             transition: right 0.3s;
             z-index: 1000;
             padding: 20px;
+            box-sizing: border-box;
         }
 
         .sidebar.open {
@@ -281,6 +284,15 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
             right: 10px;
             font-size: 24px;
             cursor: pointer;
+            color: #ffffff;
+        }
+
+        .sidebar a,
+        .sidebar p,
+        .sidebar span,
+        .sidebar li {
+            color: #ffffff;
+            text-decoration: none;
         }
 
         /* Modal */
@@ -355,7 +367,10 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
             <?php endif; ?>
 
             <div style="background:#fff;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06);">
-                <table style="width:100%;border-collapse:collapse;">
+                <div style="display:flex;justify-content:flex-start;margin-bottom:8px;">
+                    <input id="filter_role" type="search" placeholder="Search..." style="padding:8px;border:1px solid #ddd;border-radius:6px;width:260px;"> 
+                </div>
+                <table id="table_role" style="width:100%;border-collapse:collapse;">
                     <thead>
                         <tr style="text-align:left;border-bottom:1px solid #eee;">
                             <th style="padding:8px">First</th>
@@ -407,6 +422,7 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
         <span class="close-btn" onclick="toggleSidebar()">&times;</span>
         <ul>
             <li><a href="../security/input_security_question.php">Set Security</a></li>
+            <li><a href="../security/manage_security.php">Security Answer Stored</a></li>
         </ul>
     </div>
 
@@ -442,6 +458,23 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
     function logout() {
         document.getElementById('logoutModal').style.display = "flex";
     }
+
+    function filterTable(inputId, tableId) {
+        var input = document.getElementById(inputId);
+        if (!input) return;
+        var filter = input.value.toLowerCase();
+        var table = document.getElementById(tableId);
+        if (!table) return;
+        var tbody = table.getElementsByTagName('tbody')[0];
+        if (!tbody) return;
+        var rows = tbody.getElementsByTagName('tr');
+        for (var i = 0; i < rows.length; i++) {
+            var txt = rows[i].textContent.toLowerCase();
+            rows[i].style.display = txt.indexOf(filter) > -1 ? '' : 'none';
+        }
+    }
+
+    document.getElementById('filter_role')?.addEventListener('input', function(){ filterTable('filter_role','table_role'); });
 
     function closeLogoutModal() {
         document.getElementById('logoutModal').style.display = "none";

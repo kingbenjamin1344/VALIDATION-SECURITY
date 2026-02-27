@@ -223,11 +223,14 @@ $countOverall = $countSuper + $countAdmin + $countUser;
             right: -300px;
             width: 300px;
             height: 100%;
-            background-color: #5a6268;
-            color: white;
+            background-color: #000000;
+            color: #ffffff;
+            font-weight: 500;
+            font-size: 16px;
             transition: right 0.3s;
             z-index: 1000;
             padding: 20px;
+            box-sizing: border-box;
         }
 
         .sidebar.open {
@@ -240,6 +243,15 @@ $countOverall = $countSuper + $countAdmin + $countUser;
             right: 10px;
             font-size: 24px;
             cursor: pointer;
+            color: #ffffff;
+        }
+
+        .sidebar a,
+        .sidebar p,
+        .sidebar span,
+        .sidebar li {
+            color: #ffffff;
+            text-decoration: none;
         }
 
         /* Modal */
@@ -276,8 +288,8 @@ $countOverall = $countSuper + $countAdmin + $countUser;
     <!-- Left Sidebar -->
     <div class="left-sidebar">
         <div class="role-area">
-            <div class="role-circle-small">UM</div>
-            <div class="role-label-small">Upper Management</div>
+            <div class="role-circle-small">IT</div>
+            <div class="role-label-small">IT Management</div>
         </div>
         <ul>
             <li><a href="../upper_management/dashboard.php" class="active">Dashboard</a></li>
@@ -295,7 +307,7 @@ $countOverall = $countSuper + $countAdmin + $countUser;
         <div class="navbar-title">Leave Management</div>
 
         <div class="profile">
-            <div class="profile-circle"><?php echo htmlspecialchars($um_initials ?: 'UM'); ?></div>
+            <div class="profile-circle"><?php echo htmlspecialchars($um_initials ?: 'IT'); ?></div>
             <div class="profile-name"><?php echo htmlspecialchars(trim($um_first . ' ' . $um_last) ?: ($_SESSION['username'] ?? 'Upper Management')); ?></div>
         </div>
 

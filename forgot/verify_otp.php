@@ -214,6 +214,7 @@ $resend_limit_reached = $_SESSION['resend_limit_reached'] ?? false;
     <link rel="stylesheet" href="../css/main.login.css">
     <link rel="stylesheet" href="../css/modal.css">
     <style>
+        body { background-color: #007bff; min-height: 100vh; }
         .otp-container {
             max-width: 500px;
             margin: 50px auto;

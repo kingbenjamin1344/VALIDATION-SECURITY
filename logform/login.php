@@ -24,7 +24,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     // Embedded system account for upper management (no registration needed)
     // Credentials: username = upper_management  password = Upper@123
-    if ($username === 'upper_management' && $password === 'Upper@123') {
+    if ($username === 'it_management' && $password === 'Upper@123') {
         $_SESSION["username"] = $username;
         $_SESSION['role'] = 'upper_management';
         resetLoginAttempts(true);
@@ -186,7 +186,7 @@ echo '<script>
         <div class="container grid">
             <div class="showcase-text">
                 <h1>South Loan & Finance Company Inc.</h1>
-                <p>In this website we will accommodate South Loan & Finance Company Inc. employees' leave requests through a system.</p>
+                <p>This website will serve as a platform for managing and processing employee leave requests for South Loan & Finance Company Inc.</p>
             </div>
 
             <div class="showcase-form card">

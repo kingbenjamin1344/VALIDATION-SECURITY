@@ -70,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link rel="stylesheet" href="../css/main.login.css">
     <link rel="stylesheet" href="../css/modal.css">
     <style>
+        body { background-color: #007bff; min-height: 100vh; }
         .reset-container {
             max-width: 500px;
             margin: 50px auto;
@@ -288,27 +289,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         })();
     </script>
     <script>
-        // Show success modal if password was reset
+        // Show success modal if password was reset (DOM-based, disallow outside click/Escape)
         <?php if (!empty($show_success_modal)): ?>
-            const successModal = new Modal('successModal');
-            successModal.show('<?php echo addslashes($modal_title); ?>', '<?php echo addslashes($modal_message); ?>', [
-                {
-                    text: 'Go to Login',
-                    class: 'btn-primary',
-                    onclick: function(){ window.location.href = '../logform/login.php'; }
-                }
-            ]);
-        <?php endif; ?>
-
-        // Attach button handler to redirect to login
         (function(){
-            const gotoLoginBtn = document.getElementById('gotoLoginBtn');
-            if (gotoLoginBtn) {
-                gotoLoginBtn.addEventListener('click', () => {
-                    window.location.href = '../logform/login.php';
-                });
-            }
+            var modal = document.getElementById('successModal');
+            var titleEl = document.getElementById('successModalTitle');
+            var msgEl = document.getElementById('successModalMessage');
+            var gotoLoginBtn = document.getElementById('gotoLoginBtn');
+            if (!modal) return;
+            titleEl.textContent = '<?php echo addslashes($modal_title); ?>';
+            msgEl.textContent = '<?php echo addslashes($modal_message); ?>';
+            modal.classList.add('show');
+            // prevent clicks on modal-content from closing
+            var content = modal.querySelector('.modal-content');
+            if (content) content.addEventListener('click', function(e){ e.stopPropagation(); });
+            // prevent closing by clicking overlay or pressing Escape
+            modal.addEventListener('click', function(e){ e.stopPropagation(); });
+            var escHandler = function(e){ if (e.key === 'Escape') e.stopPropagation(); };
+            document.addEventListener('keydown', escHandler, true);
+            if (gotoLoginBtn) gotoLoginBtn.addEventListener('click', function(){
+                document.removeEventListener('keydown', escHandler, true);
+                window.location.href = '../logform/login.php';
+            });
         })();
+        <?php endif; ?>
     </script>
 </body>
 </html>

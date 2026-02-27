@@ -237,11 +237,14 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
             right: -300px;
             width: 300px;
             height: 100%;
-            background-color: #5a6268;
-            color: white;
+            background-color: #000000;
+            color: #ffffff;
+            font-weight: 500;
+            font-size: 16px;
             transition: right 0.3s;
             z-index: 1000;
             padding: 20px;
+            box-sizing: border-box;
         }
 
         .sidebar.open {
@@ -254,6 +257,15 @@ $users = mysqli_query($conn, "SELECT id, firstname, middlename, lastname, suffix
             right: 10px;
             font-size: 24px;
             cursor: pointer;
+            color: #ffffff;
+        }
+
+        .sidebar a,
+        .sidebar p,
+        .sidebar span,
+        .sidebar li {
+            color: #ffffff;
+            text-decoration: none;
         }
 
         /* Modal */

@@ -13,6 +13,7 @@ $message_type = '';
 $show_modal = false;
 $modal_title = '';
 $modal_message = '';
+$show_success_modal = false;
 
 // Get user and security questions
 $userStmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
@@ -61,12 +62,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if ($answer1_match && $answer2_match && $answer3_match) {
         // All answers correct
         $_SESSION['security_verified'] = true;
-        
+
         // Clean up session
         unset($_SESSION['sec_attempts']);
-        
-        header('Location: reset_password.php');
-        exit();
+
+        // Show success modal and then redirect client-side to reset page
+        $show_success_modal = true;
+        $modal_title = 'Security Verification Successful';
+        $modal_message = 'Security question answers matched.';
+        // Do not redirect here; let client handle after user acknowledges
     } else {
         // Incorrect answers
         $_SESSION['sec_attempts']++;
@@ -86,7 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-$can_continue = $_SESSION['sec_attempts'] < 5;
+$sec_attempts = isset($_SESSION['sec_attempts']) ? (int)$_SESSION['sec_attempts'] : 0;
+$can_continue = $sec_attempts < 5;
 ?>
 
 <!DOCTYPE html>
@@ -98,6 +103,7 @@ $can_continue = $_SESSION['sec_attempts'] < 5;
     <link rel="stylesheet" href="../css/main.login.css">
     <link rel="stylesheet" href="../css/modal.css">
     <style>
+        body { background-color: #007bff; min-height: 100vh; }
         .security-container {
             max-width: 600px;
             margin: 50px auto;
@@ -217,24 +223,24 @@ $can_continue = $_SESSION['sec_attempts'] < 5;
             <div class="form-group">
                 <div class="question-label">Question 1:</div>
                 <label><?php echo htmlspecialchars($securityQuestions['question_1']); ?></label>
-                <input type="text" name="answer1" required placeholder="Your answer">
+                <input type="password" name="answer1" required placeholder="Your answer" autocomplete="new-password">
             </div>
             
             <div class="form-group">
                 <div class="question-label">Question 2:</div>
                 <label><?php echo htmlspecialchars($securityQuestions['question_2']); ?></label>
-                <input type="text" name="answer2" required placeholder="Your answer">
+                <input type="password" name="answer2" required placeholder="Your answer" autocomplete="new-password">
             </div>
             
             <div class="form-group">
                 <div class="question-label">Question 3:</div>
                 <label><?php echo htmlspecialchars($securityQuestions['question_3']); ?></label>
-                <input type="text" name="answer3" required placeholder="Your answer">
+                <input type="password" name="answer3" required placeholder="Your answer" autocomplete="new-password">
             </div>
             
             <button type="submit" class="btn-submit">Verify Answers</button>
             <div class="attempt-counter">
-                Attempts: <?php echo $_SESSION['sec_attempts']; ?>/5
+                Attempts: <?php echo isset($sec_attempts) ? $sec_attempts : (isset($_SESSION['sec_attempts']) ? (int)$_SESSION['sec_attempts'] : 0); ?>/5
             </div>
         </form>
         <?php endif; ?>
@@ -259,6 +265,21 @@ $can_continue = $_SESSION['sec_attempts'] < 5;
         </div>
     </div>
 
+    <!-- Success Modal for matched answers -->
+    <div id="successModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="successModalTitle"></h2>
+            </div>
+            <div class="modal-body">
+                <p id="successModalMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn btn-primary" id="successOkBtn">OK</button>
+            </div>
+        </div>
+    </div>
+
     <script src="../jsform/modal.js"></script>
     <script>
         // Show modal if max attempts exceeded
@@ -273,6 +294,33 @@ $can_continue = $_SESSION['sec_attempts'] < 5;
                 }
             }
         ]);
+        <?php endif; ?>
+
+        // Show success modal when answers matched and redirect to reset_password.php on OK
+        <?php if ($show_success_modal): ?>
+        (function(){
+            var modal = document.getElementById('successModal');
+            var titleEl = document.getElementById('successModalTitle');
+            var msgEl = document.getElementById('successModalMessage');
+            var okBtn = document.getElementById('successOkBtn');
+            if (!modal) return;
+            titleEl.textContent = '<?php echo addslashes($modal_title); ?>';
+            msgEl.textContent = '<?php echo addslashes($modal_message); ?>';
+            // show modal (uses modal.css .show)
+            modal.classList.add('show');
+            // prevent clicks on overlay from closing: stop propagation on modal-content
+            var content = modal.querySelector('.modal-content');
+            if (content) content.addEventListener('click', function(e){ e.stopPropagation(); });
+            // prevent closing by clicking overlay or pressing Escape: add handlers that do nothing
+            modal.addEventListener('click', function(e){ e.stopPropagation(); });
+            var keyHandler = function(e){ if (e.key === 'Escape') e.stopPropagation(); };
+            document.addEventListener('keydown', keyHandler, true);
+            // OK button proceeds to reset page
+            if (okBtn) okBtn.addEventListener('click', function(){
+                document.removeEventListener('keydown', keyHandler, true);
+                window.location.href = 'reset_password.php';
+            });
+        })();
         <?php endif; ?>
 
         function goToLogin() {

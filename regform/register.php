@@ -9,6 +9,7 @@ if($_SERVER["REQUEST_METHOD"]=="POST"){
     $lastname=$_POST["lastname"];
     $suffix=$_POST["suffix"];
     $sex=$_POST["sex"];
+    $role = isset($_POST["role"]) ? $_POST["role"] : '';
     $purok=$_POST["purok"];
     $barangay=$_POST["barangay"];
     $municipality=$_POST["municipality"];
@@ -51,11 +52,19 @@ if($_SERVER["REQUEST_METHOD"]=="POST"){
         $hashed_password=password_hash($password, PASSWORD_DEFAULT);
 
     //Build and Execute the SQl query
-        $sql="INSERT INTO users (id_no,firstname,middlename,lastname,suffix,sex,purok,barangay,municipality,province,country,zipcode,email,username,birthdate,age,password)
-        VALUES ('$id_no','$firstname','$middlename','$lastname','$suffix','$sex','$purok','$barangay','$municipality','$province','$country','$zipcode','$email','$username','$birthdate','$age','$hashed_password')";
+        $sql="INSERT INTO users (id_no,firstname,middlename,lastname,suffix,sex,role,purok,barangay,municipality,province,country,zipcode,email,username,birthdate,age,password)
+        VALUES ('$id_no','$firstname','$middlename','$lastname','$suffix','$sex','$role','$purok','$barangay','$municipality','$province','$country','$zipcode','$email','$username','$birthdate','$age','$hashed_password')";
 
     if(mysqli_query($conn, $sql)){
-        echo "<script>alert('You have Successfully created and Account!'); window.location.href='../logform/login.php'; </script>";
+        $rrole = strtolower(trim($role));
+        if($rrole === 'admin'){
+            $location = '../admin/dashboard.php';
+        }elseif($rrole === 'superadmin'){
+            $location = '../superadmin/dashboard.php';
+        }else{
+            $location = '../logform/indexes.php';
+        }
+        echo "<script>alert('You have Successfully created an Account!'); window.location.href='".$location."'; </script>";
     }else{
         echo "Error: ".$sql."<br>".mysqli_error($conn);
     }
@@ -156,6 +165,17 @@ if($_SERVER["REQUEST_METHOD"]=="POST"){
                         </select>
                     </div>
                 </div>
+                <div class="input-box">
+                    <label>Role</label>
+                    <div class="custom_select">
+                        <select name="role" class="input-box1">
+                            <option value="">Select role</option>
+                            <option value="user">User</option>
+                            <option value="admin">Admin</option>
+                            <option value="superadmin">Superadmin</option>
+                        </select>
+                    </div>
+                </div>
                 </div>
                 <hr>
                 
@@ -234,7 +254,7 @@ if($_SERVER["REQUEST_METHOD"]=="POST"){
                 </div>
             </div>
 </div>
-            <p style="text-align: center;">Already registered? <a href="../logform/login.php">Log in here</a></p>
+               <!--<p style="text-align: center;">Already registered? <a href="../logform/login.php">Log in here</a></p>-->
         </form>
     </div>
     <!--  <script src="../jsform/obf_register.js"></script>

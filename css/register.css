@@ -6,12 +6,15 @@
   font-family: 'Poppins',sans-serif;
 }
 body{
-  height: 100vh;
+  margin: 0;
+  padding: 0 10px;
+  min-height: 100vh;
   display: flex;
-  justify-content: center;
   align-items: center;
-  padding: 10px;
-  background: linear-gradient(135deg, #71b7e6, #9b59b6);
+  justify-content: center;
+  background: linear-gradient(90deg, #5fa8ff 0%, #8a63d6 100%);
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 .container{
   max-width: 800px;
@@ -157,15 +160,6 @@ form .user-details .input-box{
   padding: 0;
   box-sizing: border-box;
   font-family: 'Montserrat', sans-serif;
-}
-body{
-  background-image: url("../picture/last.PNG");  
-  padding: 0 10px;
-  box-shadow: 0 0 20px rgba(500,500,500, 0.9);
-  background-repeat: no-repeat;
-  background-size: cover;
-  
-  
 }
 .wrapper{
 

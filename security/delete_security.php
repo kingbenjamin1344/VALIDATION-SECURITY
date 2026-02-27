@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $stmt->execute();
     $stmt->close();
     
-    header('Location: security_question.php?deleted=1');
+    header('Location: manage_security.php?deleted=1');
     exit();
 }
 ?>

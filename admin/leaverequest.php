@@ -62,7 +62,10 @@ try {
 <body>
     <div style="padding:20px;max-width:1100px;margin:0 auto;">
         <h1>Pending Request</h1>
-        <table>
+        <div style="display:flex;justify-content:flex-start;margin-bottom:8px;">
+            <input id="filter_leave_requests" type="search" placeholder="Search..." style="padding:8px;border:1px solid #ddd;border-radius:6px;width:260px;">
+        </div>
+        <table id="table_leave_requests">
             <thead>
                 <tr>
                     <th>User</th>
@@ -109,5 +112,21 @@ try {
             </tbody>
         </table>
     </div>
+            <script>
+                function filterTable(inputId, tableId) {
+                    var input = document.getElementById(inputId);
+                    if (!input) return;
+                    var filter = input.value.toLowerCase();
+                    var table = document.getElementById(tableId);
+                    if (!table) return;
+                    var tbody = table.getElementsByTagName('tbody')[0] || table;
+                    var rows = tbody.getElementsByTagName('tr');
+                    for (var i = 0; i < rows.length; i++) {
+                        var txt = rows[i].textContent.toLowerCase();
+                        rows[i].style.display = txt.indexOf(filter) > -1 ? '' : 'none';
+                    }
+                }
+                document.getElementById('filter_leave_requests')?.addEventListener('input', function(){ filterTable('filter_leave_requests','table_leave_requests'); });
+            </script>
 </body>
 </html>

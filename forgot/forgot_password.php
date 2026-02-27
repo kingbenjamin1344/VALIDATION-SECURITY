@@ -122,6 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link rel="stylesheet" href="../css/main.login.css">
     <link rel="stylesheet" href="../css/modal.css">
     <style>
+        body { background-color: #007bff; min-height: 100vh; }
         .forgot-container {
             max-width: 500px;
             margin: 50px auto;
